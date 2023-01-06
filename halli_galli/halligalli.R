@@ -1,0 +1,317 @@
+
+
+# ---------------------
+# SIMULATES ONE GAME
+# ---------------------
+simulate_game <- function(a_p, return_card_count) {
+  # ---------------------
+  # CREATE DECK OF CARDS
+  # ---------------------
+  
+  # there are 4 types of cards, each can have a value of 1 to 5
+  # so numbering goes like this: 1-1, 1-2, 1-3, 1-4, 1-5, 2-1, 2-2, 2-3, ...
+  cards <- c(0,0,1,1,1,2,2,2,2,3,3,3,4,4,5,5,6,6,6,7,7,7,7,8,8,8,9,9,10,10,11,11,11,12,12,12,12,13,13,13,14,14,15,15,16,16,16,17,17,17,17,18,18,18,19,19)
+  
+  
+  # ---------------------
+  # HAND CARDS TO PLAYERS (UNTIL DECK IS EMPTY)
+  # ---------------------
+  amount_players <- a_p
+  player_hands <- list()
+  
+  for(i in 1:amount_players) {
+    player_hands[[i]] <- list()
+  }
+  
+  temp_player <- 1
+  
+  # while there are cards to distribute
+  while(length(cards) > 0) {
+    
+    # pick a random one from the deck
+    random_card <- sample(cards, 1)
+    current_hand_size <- length(player_hands[[temp_player]])
+    player_hands[[temp_player]][[current_hand_size+1]] <- random_card
+    
+    # remove it from deck
+    index <- which(cards == random_card)
+    if(length(index) > 0) { index <- index[[1]] }
+    cards <- cards[-index]
+    
+    # go to next player
+    temp_player <- temp_player + 1
+    if(temp_player > amount_players) {
+      temp_player <- 1
+    }
+  }
+  
+  # ---------------------
+  # PLAY THE GAME!
+  # ---------------------
+  
+  # this variables holds the cards that are on the table (the last few are actually visible)
+  cards_on_table <- list()
+  
+  # sets the starting player
+  cur_player <- sample(1:amount_players, 1)
+  out_of_game <- list()
+  
+  # strategies
+  player_strategies <- list()
+  
+  for(i in 1:amount_players) {
+    player_strategies <- list(0, 0.1, 0.1)
+    out_of_game[[i]] <- FALSE
+  }
+  
+  player_strategies[[1]] <- list(0.025, 0.7, 0.8, 0, 0, 0)
+  player_strategies[[2]] <- list(0, 0, 0, 0, 4, 0)
+  player_strategies[[3]] <- list(0, 0, 0, 0, 4, 1)
+  player_strategies[[4]] <- list(0, 0, 0, 11, 0, 0)
+
+  
+  # keep track of when the game's finished, and who won
+  somebody_won <- FALSE
+  who_won <- 0
+  
+  amount_cards_check <- list()
+  turn_count <- 0
+  
+  # while nobody has lost yet, the game continues
+  while(!somebody_won) {
+    
+    # if this player is out of the game
+    if(out_of_game[[cur_player]] || length(player_hands[[cur_player]]) == 0) {
+      cur_player <- cur_player + 1
+      if(cur_player > amount_players) {
+        cur_player <- 1
+      }
+      
+      # count if the game should be over
+      winner <- 0
+      amount_in_game <- 0
+      for(i in 1:amount_players) {
+        if(out_of_game[[i]] || length(player_hands[[i]]) == 0) {
+          out_of_game[[i]] <- TRUE
+        } else {
+          amount_in_game <- amount_in_game + 1
+          winner <- i
+        }
+      }
+      
+      # if the game is over
+      if(amount_in_game <= 1) {
+        somebody_won <- TRUE
+        who_won <- winner
+      }
+      
+      next
+    }
+
+    # count amount of cards on table for each player
+    if(return_card_count) {
+      temp_list <- list()
+      for(i in 1:amount_players) {
+        temp_list[[i]] <- length(player_hands[[i]])
+      }
+      amount_cards_check[[(length(amount_cards_check)+1)]] <- temp_list
+    }
+    
+    # play top card
+    new_card <- player_hands[[cur_player]][[1]]
+    player_hands[[cur_player]] <- player_hands[[cur_player]][-1]
+    
+    amount_on_table <- length(cards_on_table) + 1
+    cards_on_table[[amount_on_table]] <- new_card
+    
+    turn_count <- turn_count + 1
+    
+    # check if there's a Halli Galli
+    # for each type of card
+    halli_galli <- FALSE
+    total_count <- list(0,0,0,0)
+    minimum <- max(amount_on_table-amount_players, 1)
+    for(i in 1:4) {
+      # go through all visible cards on the table
+      for(j in minimum:amount_on_table) {
+        # count 'em
+        if(floor(cards_on_table[[j]] / 5) == (i - 1)) {
+          total_count[[i]] <- total_count[[i]] + (cards_on_table[[j]] %% 5)
+        }
+      }
+      if(total_count[[i]] == 5) {
+        halli_galli <- TRUE
+        break
+      }
+      
+      # remove card last played for the "card counting" strategy
+      total_count[[floor(new_card / 5) + 1]] <- total_count[[floor(new_card / 5) + 1]] - 1
+    }
+    
+    # everyone responds
+    reaction_times <- list()
+    for(i in 1:amount_players) {
+      
+      # if he/she is not out of the game
+      if(out_of_game[[i]] == FALSE) {
+        my_strat <- player_strategies[[i]]
+        should_react <- FALSE
+        
+        # we make a mistake
+        if(runif(1, 0.0, 1.0) <= my_strat[[1]]) {
+          
+          if(halli_galli) {
+            # if there's a halli galli, we don't see it
+            should_react <- FALSE
+          } else {
+            # we a see a halli galli, but there is none
+            should_react <- TRUE
+          }
+        } else {
+          if(my_strat[[4]] > 0) {
+            if( (turn_count %% my_strat[[4]]) == 0) {
+              should_react <- TRUE
+            }
+          } else if(my_strat[[5]] > 0) {
+            if(length(cards_on_table) >= 11 && (turn_count %% my_strat[[5]] == 0) ) {
+              should_react <- TRUE
+            }
+          } else if(my_strat[[6]] > 0) {
+            
+            # count cards to see what is a logical next step
+            likely <- 0
+            unlikely <- 0
+            impossible <- 0
+            
+            for(j in 1:4) {
+              if(total_count[[j]] == 2 || total_count[[j]] == 3) {
+                likely <- likely + 1
+              } else if(total_count[[j]] == 0 || total_count[[j]] == 1 || total_count[[j]] == 4) {
+                unlikely <- unlikely + 1
+              } else if(total_count[[j]] >= 5) {
+                impossible <- impossible + 1
+              }
+            }
+            
+            if(likely * 2 + unlikely * 1 - impossible * 1 >= 4) {
+              should_react <- TRUE
+            }
+            
+          } else if(halli_galli) {
+            should_react <- TRUE
+          }
+        }
+        
+        # calculate reaction times, if we react at all
+        if(should_react) {
+          temp_rand <- rexp(1, (1.0/my_strat[[2]]))
+          temp_rand2 <- rexp(1, (1.0/my_strat[[3]]))
+          reaction_times[[i]] <- temp_rand + temp_rand2
+        } else {
+          reaction_times[[i]] <- 10000
+        }
+        
+      } else {
+        reaction_times[[i]] <- 10000
+      }
+    }
+    
+    # check who was first
+    best_time <- 10000
+    best_player <- 0
+    
+    for(i in 1:amount_players) {
+      if(reaction_times[[i]] < best_time) {
+        best_player <- i
+        best_time <- reaction_times[[i]]
+      }
+    }
+    
+    # if anybody actually went for the bell
+    if(best_time < 10000 && best_player != 0) {
+      # if it was a halli galli, give him cards, make him start player
+      if(halli_galli) {
+        for(i in 1:amount_on_table) {
+          player_hands[[cur_player]][[length(player_hands[[cur_player]])+1]] <- cards_on_table[[i]]
+        }
+        cards_on_table <- list()
+        
+        cur_player <- best_player - 1
+      } else {
+        # the player must hand out cards to every other player
+        for(i in 1:amount_players) {
+          if(i != best_player && !out_of_game[[i]]) {
+            if(length(player_hands[[best_player]]) > 0) {
+              pick_card <- player_hands[[best_player]][[1]]
+              player_hands[[i]][[length(player_hands[[i]])+1]] <- pick_card
+              player_hands[[best_player]] <- player_hands[[best_player]][-1]
+            }
+          }
+        }
+      }
+      
+      # count if any player is out of cards
+      winner <- 0
+      amount_in_game <- 0
+      for(i in 1:amount_players) {
+        if(out_of_game[[i]] || length(player_hands[[i]]) == 0) {
+          out_of_game[[i]] <- TRUE
+        } else {
+          amount_in_game <- amount_in_game + 1
+          winner <- i
+        }
+      }
+      
+      # if the game is over
+      if(amount_in_game <= 1) {
+        somebody_won <- TRUE
+        who_won <- winner
+      }
+      
+    } 
+    
+    # go to next player
+    cur_player <- cur_player + 1
+    if(cur_player > amount_players) {
+      cur_player <- 1
+    }
+    
+  }
+  
+  if(return_card_count) {
+    return(amount_cards_check)
+  } else {
+    return(who_won)
+  }
+}
+
+# simulate this shizzle many times, accumulate results
+amount_sim <- 100
+results <- rep(0, amount_sim)
+amount_players <- 4
+amount_cards_global <- NULL
+
+# simulate one time to get a timeline of how many cards each player has
+amount_cards_global <- simulate_game(amount_players, TRUE)
+
+for(i in 1:amount_sim) {
+  results[[i]] <- simulate_game(amount_players, FALSE)
+}
+
+# display discrete histogram (which is apparently a barplot)
+par(bg=NA)
+barplot(table(results), xlab = "speler", ylab = "aantal potjes gewonnen")
+
+# display overview of how many cards a player has
+categories <- c("Player 1", "Player 2", "Player 3", "Player 4", "Player 5", "Player 6", "Player 7")
+colors <- c("green", "blue", "black", "magenta", "orange", "red", "purple")
+markers <- 1:amount_players
+
+a_matrix <- matrix(unlist(amount_cards_global), ncol = amount_players, byrow = TRUE)
+
+matplot(1:nrow(a_matrix), a_matrix, type="l", col=colors, lty=1, pch=markers,
+        bty="n", las=1, xlab="beurten", ylab="aantal kaarten")
+legend("topleft", col=colors, categories, bg="transparent", lwd=1, pch=markers)
+
+
+
