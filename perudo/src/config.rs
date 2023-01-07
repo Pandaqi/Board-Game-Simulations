@@ -1,4 +1,4 @@
-use crate::{guesser::{StratInitial, StratGuess, StratBluff}, challenger::StratChall};
+use crate::{guesser::{StratInitial, StratGuess, StratBluff}, challenger::StratChall, helpers::Strat};
 
 pub struct StratListStruct {
     pub bluff: Vec<StratBluff>,
@@ -18,4 +18,10 @@ pub struct SimConfig {
     pub use_no_perudo_round: bool, // "palafico": the round immediately after a player reaching 1 dice, aces don't count
     pub use_palafico_guessing: bool, // "palafico": in such a round, you also can't change the VALUE, only the NUMBER (most people don't know this rule, so it's optional)
     pub strats: StratListStruct,
+    pub fixed_strat: Strat,
+    pub player_data_update_increment: f64,
+    pub create_images: bool,
+    pub print_gameplay: bool,
+    pub track_per_player: bool,
+    pub print_interval: usize
 }

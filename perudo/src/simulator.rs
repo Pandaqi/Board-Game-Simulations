@@ -9,6 +9,7 @@ impl Simulator
     pub fn setup(cfg:&SimConfig) -> SimResults
     {
         SimResults {
+            wins_per_player: Vec::new(),
             strats: StratListStruct {
                 bluff: Vec::new(),
                 init: Vec::new(),
@@ -26,7 +27,7 @@ impl Simulator
 
         for n in 0..sim_config.num_iterations
         {
-            if n % 10000 == 0 { println!("Playing game {}", n); }
+            if n % sim_config.print_interval == 0 { println!("Playing game {}", n); }
             Game::play(sim_config, &mut sim_results);
         }
 

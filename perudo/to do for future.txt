@@ -1,0 +1,11 @@
+== To-Do for "part 2" ==
+
+* Keep track of those "bluff/challenge" probabilities for _all_ players during the game. This would allow proper calculations in simulation where you play until you have a WINNER
+  * Currently, it pretends the player before and after you will stay identical the whole game, and tracks only them.
+* Add many more strategies, mostly aimed at trying different values for all the fixed numbers that appear through the calculation. (Boundaries of a "random" guess, the speed at which you update your information about other players, etcetera)
+* Add the special rules and variations
+* Make strategies dynamic, able to change midway based on whatever.
+  * Different strategy in "palafico" rounds
+  * Strategies around aces and their special use cases
+  * Strategies that incorporate how many players will take a turn before it's back to your turn. (This is useful in preventing the bid from coming back to you at an unfortunate moment.)
+  * Perhaps allow _multiple_ values for each strategy (in a vector / list)

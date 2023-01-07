@@ -2,12 +2,13 @@ use std::collections::HashMap;
 
 use rand::{Rng, seq::SliceRandom};
 
-use crate::{guesser::{StratInitial, StratGuess, StratBluff}, challenger::StratChall, config::SimConfig};
+use crate::{guesser::{StratInitial, StratGuess, StratBluff}, challenger::StratChall, config::SimConfig, game::PlayerData};
 
 // First = number of dice, Second = value
 pub type Guess = (usize, usize);
 
 // The strategy a specific player is using
+#[derive(Copy, Clone, Debug)]
 pub struct Strat {
     pub bluff: StratBluff,
     pub init: StratInitial,
@@ -21,31 +22,106 @@ pub struct Helpers {}
 
 impl Helpers 
 {
-    pub fn get_all_valid_guesses(cur_guess:Guess, num_dice:usize) -> Vec<Guess>
+    pub fn print<T>(cfg:&SimConfig, txt:T) where T: std::fmt::Debug
+    {
+        if !cfg.print_gameplay { return; }
+        println!("{:#?}", txt);
+    }
+
+    pub fn should_bluff(strat:&Strat, my_dice:&Vec<usize>) -> bool
+    {
+        let mut rng = rand::thread_rng();
+        let rand_num = rng.gen::<f64>();
+        let num_dice = my_dice.len();
+
+        match strat.bluff
+        {
+            StratBluff::Never => { return false; }
+            StratBluff::Always => { return true; }
+            StratBluff::High => {  return rand_num <= 0.75; }
+            StratBluff::Medium => { return rand_num <= 0.5; }
+            StratBluff::Low => { return rand_num <= 0.25; }
+            StratBluff::LowToHigh => {
+                if num_dice <= 2 { return rand_num <= 0.75; }
+                return rand_num <= 0.25;
+            }
+            StratBluff::HighToLow => {
+                if num_dice <= 2 { return rand_num <= 0.25; }
+                return rand_num <= 0.75;
+            }
+        }
+    }
+
+    pub fn will_prev_player_bluff(data:&PlayerData, strat:&Strat) -> bool
+    {
+        let mut rng = rand::thread_rng();
+        let prob = strat.prev_player * data.prev.clamp(0.0, 1.0);
+        return rng.gen::<f64>() <= prob;
+    }
+
+    pub fn will_next_player_challenge(data:&PlayerData, strat:&Strat, remaining_guesses:usize) -> bool
+    {
+        if remaining_guesses <= 1 { return true; }
+        
+        let mut rng = rand::thread_rng();
+        let prob = strat.next_player * data.next.clamp(0.0, 1.0);
+        return rng.gen::<f64>() <= prob;
+    }
+
+    // NOTE: these are automatically ORDERED from safest to least safe bet
+    // (just by how the loops are structured)
+    pub fn get_all_valid_guesses(guess_history:&Vec<Guess>, num_dice:usize, palafico:bool) -> Vec<Guess>
     {
         let mut arr:Vec<Guess> = Vec::new();
+        let cur_guess = guess_history.last().unwrap();
 
-        // if we increase the VALUE, we can turn the other number into anything
-        let start_bound = cur_guess.1 + 1;
-        if start_bound <= 6
+        // TO DO?? Put the rule about ace bids behind a cfg toggle?
+        let cur_bid_is_aces = cur_guess.1 == 1;
+
+        // consider all combinations
+        // only allow those where at least ONE of the values is higher
+        for i in 1..=num_dice
         {
-            for i in start_bound..=6
+            let start_val = if cur_bid_is_aces { 1 } else { 2 };
+            for j in start_val..=6
             {
-                for j in 1..=num_dice
-                {
-                    arr.push((j, i))
-                }
-            } 
+                if palafico && j != cur_guess.1 { continue; } // palafico = during a no perudo round, you're only allowed to raise NUMBER, not VALUE
+                if cur_bid_is_aces && j != 1 && i < (2*cur_guess.0 + 1) { continue; } // to switch from ace bid to normal numbers, you must raise the number and add 1 (at least) 
+                if i <= cur_guess.0 { continue; }
+                arr.push((i, j));
+            }
         }
-        
-        // if we keep VALUE the same, the other number must be higher than what it is now
-        let start_bound_num = cur_guess.0 + 1;
-        for i in start_bound_num..=num_dice
+
+        if !cur_bid_is_aces && cur_guess.0 >= 4
         {
-            arr.push((i, cur_guess.1));
+            let half_prev_bid = (0.5 * (cur_guess.0 as f64)).ceil() as usize;
+            let ace_bid = (half_prev_bid, 1);
+            let mut already_guessed = false;
+            for v in guess_history.iter()
+            {
+                if !(v.0 == ace_bid.0 && v.1 == ace_bid.1) { continue; }
+                already_guessed = true;
+                break;
+            }
+
+            if !already_guessed
+            {
+                arr.push(ace_bid);
+            }     
         }
 
         return arr;
+    }
+
+    pub fn count_players_left(all_dice:&Vec<Vec<usize>>) -> usize
+    {
+        let mut count = 0;
+        for v in all_dice.iter()
+        {
+            if v.len() <= 0 { continue; }
+            count += 1;
+        }
+        return count;
     }
 
     pub fn pick_random_strategy(cfg:&SimConfig) -> Strat
@@ -62,6 +138,17 @@ impl Helpers
         return strat;
     }
 
+    pub fn pick_non_existent_dice_value_no_aces(dice:&Vec<usize>) -> usize
+    {
+        let all_values = vec![2,3,4,5,6];
+        for v in all_values.iter()
+        {
+            if dice.contains(v) { continue; }
+            return *v;
+        }
+        return 0;
+    }
+
     pub fn get_random_die_value() -> usize
     {
         let mut rng = rand::thread_rng();
@@ -71,7 +158,9 @@ impl Helpers
     pub fn get_start_player(count:usize) -> usize
     {
         let mut rng = rand::thread_rng();
-        return rng.gen_range(0..count) as usize;
+        let range = 0..count;
+        if range.is_empty() { return 0; }
+        return rng.gen_range(range) as usize;
     }
     
     pub fn is_initial_guess(guess:Guess) -> bool
@@ -79,103 +168,28 @@ impl Helpers
         return guess.0 == 0 && guess.1 == 0;
     }
 
-    pub fn cap_guess_num(num_dice:usize, num:usize) -> usize
-    {
-        if num >= num_dice { return num_dice; }
-        if num <= 1 { return 1; }
-        return num;
-    }
-
-    pub fn cap_guess_val(val:usize) -> usize
-    {
-        if val >= 6 { return 6; }
-        if val <= 1 { return 1; }
-        return val;
-    }
-
-    pub fn get_highest_val(dice:&Vec<usize>) -> usize
-    {
-        return *dice.iter().max().unwrap();
-    }
-
-    pub fn get_lowest_val(dice:&Vec<usize>) -> usize
-    {
-        return *dice.iter().min().unwrap();
-    }
-
-    pub fn get_mid_val(dice:&Vec<usize>) -> usize
-    {
-        let max = Helpers::get_highest_val(dice);
-        let min = Helpers::get_lowest_val(dice);
-        for v in dice.iter()
-        {
-            if *v == min || *v == max { continue; }
-            return *v;
-        }
-        return max;
-    }
-
-    pub fn get_most_frequent_val(dice:&Vec<usize>) -> usize
-    {
-        let vec = Helpers::sort_by_frequency(dice);
-        return vec[vec.len() - 1];
-    }
-
-    pub fn get_mid_frequent_val(dice:&Vec<usize>) -> usize
-    {
-        let vec = Helpers::sort_by_frequency(dice);
-        let avg_idx = (0.5 * (vec.len() as f64)).floor() as usize;
-        return vec[avg_idx];
-    }
-
-    pub fn get_least_frequent_val(dice:&Vec<usize>) -> usize
-    {
-        let vec = Helpers::sort_by_frequency(dice);
-        return vec[0];
-    }
-
-    pub fn get_closest_val_ascending(dice:&Vec<usize>, val:usize) -> usize
-    {
-        let mut closest_dist:i32 = 1000;
-        let mut closest_val:usize = 0;
-        for v in dice.iter()
-        {
-            let dist:i32 = (*v as i32) - (val as i32);
-            if dist < 0 { continue; }
-            if dist >= closest_dist { continue; }
-
-            closest_dist = dist;
-            closest_val = *v;
-        }
-        return closest_val;
-    }
-
-    pub fn calculate_expected_value(dice:&Vec<usize>, num_dice:usize, val:usize) -> usize
+    pub fn calculate_expected_value(dice:&Vec<usize>, num_dice:usize, val:usize, no_perudo_round:bool) -> usize
     {
         let unknown_dice = num_dice - dice.len();
-        let my_input = Helpers::count_dice_with_val(dice, val);
-        let prob = 2.0/6.0; // either the same number or a perudo/ace 
+        let my_input = Helpers::count_dice_with_val(dice, val, no_perudo_round);
+        let mut prob = 2.0/6.0; // either the same number or a perudo/ace 
+        if no_perudo_round { prob = 1.0/6.0; }
+
         let their_input = (unknown_dice as f64) * prob;
-        return (my_input as f64 + their_input).round() as usize;
+        let mut exp_val = (my_input as f64 + their_input).floor() as usize;
+        exp_val = exp_val.clamp(1, num_dice-1);
+        return exp_val;
     }
 
-    // This sorts ASCENDING
-    pub fn sort_by_frequency(dice:&Vec<usize>) -> Vec<usize>
+    pub fn count_dice_with_val(dice:&Vec<usize>, val:usize, no_perudo_round:bool) -> usize
     {
-        let mut m: HashMap<usize, usize> = HashMap::new();
-        for v in dice {
-            *m.entry(*v).or_default() += 1;
+        let mut sum = 0;
+        for v in dice.iter()
+        {
+            if !(*v == val || (*v == 1 && !no_perudo_round)) { continue; }
+            sum += 1;
         }
-
-        let mut arr:Vec<usize> = m.clone().into_keys().collect();
-        arr.sort_by(|a, b| m[a].partial_cmp(&m[b]).unwrap());
-
-        return arr.clone();
-    }
-
-    pub fn count_dice_with_val(dice:&Vec<usize>, val:usize) -> usize
-    {
-        return dice.iter().filter(|&n| *n == val).count()
+        return sum;
     }
         
     pub fn to_string_list<T>(list:&Vec<T>) -> Vec<String> where T: std::fmt::Display

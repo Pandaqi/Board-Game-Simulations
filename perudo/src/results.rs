@@ -4,6 +4,7 @@ use plotters::{prelude::*, coord::ranged1d::AsRangedCoord};
 use std::{ops::Range, collections::HashMap};
 
 pub struct SimResults {
+    pub wins_per_player: Vec<usize>,
     pub strats: StratListStruct,
 }
 
@@ -27,14 +28,24 @@ impl Results
         let next_player_options = Helpers::to_string_list(&cfg.strats.next_player);
         let chall_offset_options = Helpers::to_string_list(&cfg.strats.chall_offset);
 
-        // TO DO: now we just cast the numeric options to strings as well ... is that right?
+        let player_wins = Helpers::to_string_list(&res.wins_per_player);
+        let player_options = Helpers::to_string_list(&vec![0,1,2,3]);
 
-        Results::to_histogram(cfg, "bluff", bluff_strats, bluff_options);
-        Results::to_histogram(cfg, "init", init_strats, init_options);
-        Results::to_histogram(cfg, "guess", guess_strats, guess_options);
-        Results::to_histogram(cfg, "prev_player", prev_player_strats, prev_player_options);
-        Results::to_histogram(cfg, "next_player", next_player_strats, next_player_options);
-        Results::to_histogram(cfg, "chall_offset", chall_offset_strats, chall_offset_options);
+        // TO DO: now we just cast the numeric options to strings as well ... is that right? 
+        // Need to figure out how to use Plotters library for histograms of numbers and booleans as well
+
+        if cfg.create_images {
+            if cfg.track_per_player {
+                Results::to_histogram(cfg, "per_player_check", player_wins, player_options);
+            } else {
+                Results::to_histogram(cfg, "bluff", bluff_strats, bluff_options);
+                Results::to_histogram(cfg, "init", init_strats, init_options);
+                Results::to_histogram(cfg, "guess", guess_strats, guess_options);
+                Results::to_histogram(cfg, "prev_player", prev_player_strats, prev_player_options);
+                Results::to_histogram(cfg, "next_player", next_player_strats, next_player_options);
+                Results::to_histogram(cfg, "chall_offset", chall_offset_strats, chall_offset_options);    
+            }
+        }
     }
     
     
@@ -47,7 +58,12 @@ impl Results
         let root_area = BitMapBackend::new(&file_path, (600, 400)).into_drawing_area();
         root_area.fill(&WHITE).unwrap();
     
-        let graph_title = "Losses per ".to_owned() + file_key + " strategy";
+        let mut graph_title = "Losses per ".to_owned() + file_key + " strategy";
+        if cfg.continue_until_winner { graph_title = "Wins per ".to_owned() + file_key + " strategy"; }
+        if cfg.track_per_player { 
+            if cfg.continue_until_winner { graph_title = "Wins per player".to_owned(); }
+            else { graph_title = "Losses per player".to_owned(); }
+        }
 
         let mut ctx = ChartBuilder::on(&root_area)
             .set_label_area_size(LabelAreaPosition::Left, 40)
