@@ -1,0 +1,13 @@
+[package]
+name = "exploding_kittens"
+description = "Statistical simulation of the game Exploding Kittens to figure out the best strategies"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rand = "0.8.4"
+plotters = "0.3.4"
+enum-iterator = "1.2.0"
+lazy_static = "1.4.0"
