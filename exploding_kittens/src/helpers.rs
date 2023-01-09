@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 
-use rand::{Rng, seq::SliceRandom};
+use rand::{Rng, seq::{SliceRandom, IteratorRandom}};
 
 use crate::strats::{CardData, Card, Hand, Strat, StratNope, StratCombo};
 
@@ -43,48 +43,49 @@ impl Helpers
         return all_cards;
     }
 
-    pub fn request_nope_based_on_strategy(strat:StratNope) -> bool
+    pub fn get_random_card() -> Card
     {
-        let mut prob:f64 = 0.0;
         let mut rng = rand::thread_rng();
-        match strat
-        {
-            StratNope::Random => { prob = 0.1; }
-            StratNope::Never => { prob = 0.0; }
-            StratNope::Rarely => { prob = 0.25; }
-            StratNope::Sometimes => { prob = 0.5; }
-            StratNope::Often => { prob = 0.75; }
-            StratNope::Always => { prob = 1.0; }
-            _ => { }
-        }
-        return rng.gen::<f64>() <= prob;
+        let mut card = *CARD_DATA.keys().choose(&mut rng).unwrap();
+        if card == Card::Kitten { card = Card::Defuse; }
+        return card;
     }
 
-    pub fn request_combo_based_on_strategy(strat:StratCombo) -> bool
+    pub fn get_player_with_most_cards(valid_players:Vec<usize>, hands:&Vec<Hand>) -> usize
     {
-        let mut prob:f64 = 0.0;
-        let mut rng = rand::thread_rng();
-        match strat
+        let mut num:usize = 0;
+        let mut max:usize = 0;
+        for (k,v) in hands.iter().enumerate()
         {
-            StratCombo::Random => { prob = 0.33; }
-            StratCombo::Never => { prob = 0.0; }
-            StratCombo::Rarely => { prob = 0.25; }
-            StratCombo::Sometimes | StratCombo::ThreesSometimes => { prob = 0.5; }
-            StratCombo::Often => { prob = 0.75; }
-            StratCombo::Always | StratCombo::ThreesAlways => { prob = 1.0; }
+            if !valid_players.contains(&k) { continue; }
+            if v.len() <= max { continue; }
+            max = v.len();
+            num = k;
         }
-        return rng.gen::<f64>() <= prob;
+        return num;
     }
 
-    pub fn remove_combo_cards(cards:&Hand) -> Hand
+    pub fn get_player_with_least_cards(valid_players:Vec<usize>, hands:&Vec<Hand>) -> usize
     {
-        let mut arr:Hand = Vec::new();
-        for v in cards.iter()
+        let mut num:usize = 0;
+        let mut min:usize = 1000;
+        for (k,v) in hands.iter().enumerate()
         {
-            if CARD_DATA[v].combo { continue; }
-            arr.push(*v);
+            if !valid_players.contains(&k) { continue; }
+            if v.len() >= min { continue; }
+            min = v.len();
+            num = k;
         }
-        return arr;
+        return num;
+    }
+
+    pub fn create_frequency_map(arr:&Vec<Card>) -> HashMap<Card, usize>
+    {
+        let mut map = HashMap::new();
+        for n in arr {
+            *map.entry(*n).or_insert(0) += 1;
+        }
+        return map;
     }
 
     pub fn get_random_player_count() -> usize
@@ -97,46 +98,6 @@ impl Helpers
     {
         let next_player = (num + 1) % player_count;
         return next_player == other_num && Helpers::card_is_agressive(card);
-    }
-
-    pub fn opponent_will_nope(num:usize, card:Card, hands:&mut Vec<Hand>, strat:&Strat, direct_attack:bool) -> bool
-    {
-        if !hands[num].contains(&Card::Nope) { return false; }
-
-        let will_nope:bool;
-        let mut rng = rand::thread_rng();
-        match strat.nope
-        {
-            StratNope::Random => { will_nope = rng.gen::<f64>() <= 0.1; }
-            StratNope::Never => { will_nope = false; }
-            StratNope::Rarely => { will_nope = rng.gen::<f64>() <= 0.25; }
-            StratNope::Sometimes => { will_nope = rng.gen::<f64>() <= 0.5; }
-            StratNope::Often => { will_nope = rng.gen::<f64>() <= 0.75; }
-            StratNope::Always => { will_nope = true; }
-            StratNope::OnlyIfSafe => {
-                will_nope = hands[num].len() >= 5;
-            }
-            StratNope::OnlyDefuseless => {
-                will_nope = !hands[num].contains(&Card::Defuse);
-            }
-            StratNope::Direct => {
-                will_nope = direct_attack;
-            }
-            StratNope::DirectUnsafe => {
-                will_nope = direct_attack && !hands[num].contains(&Card::Defuse);
-            }
-            StratNope::Wait => {
-                will_nope = hands.len() <= 2;
-            }
-            StratNope::DeNope => { 
-                will_nope = card == Card::Nope;
-            }
-            StratNope::DeNopeDirect => {
-                will_nope = direct_attack && card == Card::Nope;
-            }
-        }
-
-        return will_nope;
     }
 
     pub fn sort_descending(arr:&mut Vec<usize>)
@@ -196,9 +157,10 @@ impl Helpers
         return arr;
     }
 
+    // TO DO/NOTE: maybe not the best way to check agressiveness, but it's a good fit for now
     pub fn card_is_agressive(card:Card) -> bool
     {
-        return CARD_DATA[&card].anti; // maybe not the best way to check agressiveness, but it's a good fit for now
+        return CARD_DATA[&card].anti; 
     }
 
     pub fn to_string_list<T>(list:&Vec<T>) -> Vec<String> where T: std::fmt::Display

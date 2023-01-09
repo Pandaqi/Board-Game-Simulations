@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::{game::{Game, DrawResult, GameState, Debugger}, helpers::Helpers, strats::{StratPlay, StratKitten, Card, Strat, Hand, StratNope}, simulator::Simulator};
+    use crate::{game::{Game, DrawResult, GameState, Debugger}, helpers::Helpers, strats::{StratPlay, StratKitten, Card, Strat, Hand, StratNope}, simulator::Simulator, nope::Nope};
 
     #[test]
     #[ignore]
@@ -22,8 +22,10 @@ mod tests {
 
         let mut players_alive:Vec<usize> = (0..count).collect();
         let mut strategies = Game::generate_random_strategies(count, &options);
+        let mut state = GameState::new();
+        state.init(count);
         
-        Game::kill_player(1, &mut hands, &mut players_alive, &mut strategies);
+        Game::kill_player(1, &mut hands, &mut players_alive, &mut strategies, &mut state);
         assert_eq!(hands.len(), 1);
         assert_eq!(players_alive.len(), 1);
         assert_eq!(strategies.len(), 1);
@@ -89,6 +91,7 @@ mod tests {
 
         // favour should lead to us having one more card
         state = GameState::new();
+        state.init(2);
         hands = vec![vec![Card::Favor], vec![Card::Skip]];
         Game::execute_card(num, &mut hands, (Card::Favor, 1), &mut deck, &strats, &mut state);
         assert_eq!(hands[num].len(), 2);
@@ -99,7 +102,7 @@ mod tests {
         state = GameState::new();
         hands = vec![vec![Card::Attack]];
         Game::execute_card(num, &mut hands, (Card::Attack, 1), &mut deck, &strats, &mut state);
-        assert_eq!(state.repeat_turns, 2);
+        assert_eq!(state.repeat_turns, 1);
         assert_eq!(state.skip_draw, true);
 
         // test playable and unplayable cards
@@ -121,20 +124,24 @@ mod tests {
     #[test]
     fn test_card_stealing()
     {
+        let count:usize = 2;
         let mut hands:Vec<Hand> = vec![vec![], vec![]];
         let options = Simulator::setup().options;
         let strat = Strat::new_random(&options);
+        let mut state = GameState::new();
+        state.init(count);
 
         // should do nothing (and not crash) if nobody to steal from
-        Game::steal_card(0, &mut hands, &strat);
+        Game::steal_card(0, &mut hands, &strat, &mut state, false);
         assert_eq!(hands[0].len(), 0);
 
         // regular steal
         hands = vec![vec![], vec![Card::Nope]];
-        Game::steal_card(0, &mut hands, &strat);
+        Game::steal_card(0, &mut hands, &strat, &mut state, false);
         assert_eq!(hands[0], vec![Card::Nope]);
 
         // TO DO: test specific strategies / combo stealing
+        // (fourth parameter = true) for specific card requesting
     }
 
     #[test]
@@ -171,21 +178,22 @@ mod tests {
         let options = Simulator::setup().options;
         let mut strat = Strat::new_random(&options);
         strat.kitten = StratKitten::Top;
+        let state = GameState::new();
 
         // tests top strategy
-        Game::put_back_kitten(0, &hands, &mut deck, &strat);
+        Game::put_back_kitten(0, &hands, &mut deck, &strat, &state);
         assert_eq!(*deck.last().unwrap(), Card::Kitten);
 
         // tests empty deck
         deck = vec![];
-        Game::put_back_kitten(0, &hands, &mut deck, &strat);        
+        Game::put_back_kitten(0, &hands, &mut deck, &strat, &state);        
         assert_eq!(deck, vec![Card::Kitten]);
 
         // tests top cond strategy
         hands = vec![vec![Card::Attack], vec![Card::Attack]];
         deck = vec![Card::Nope, Card::Attack, Card::Skip];
         strat.kitten = StratKitten::TopCond;
-        Game::put_back_kitten(0, &hands, &mut deck, &strat);
+        Game::put_back_kitten(0, &hands, &mut deck, &strat, &state);
         assert_eq!(*deck.last().unwrap(), Card::Kitten);
     }
 
@@ -206,11 +214,11 @@ mod tests {
 
         // basic nope decision 
         let direct_attack = true;
-        assert_eq!(Helpers::opponent_will_nope(opponent_num, card, &mut hands, &strat, direct_attack), true);
+        assert_eq!(Nope::opponent_will_nope(opponent_num, card, &mut hands, &strat, direct_attack), true);
 
         // no nope cards
         hands[1] = Vec::new();
-        assert_eq!(Helpers::opponent_will_nope(opponent_num, card, &mut hands, &strat, direct_attack), false);
+        assert_eq!(Nope::opponent_will_nope(opponent_num, card, &mut hands, &strat, direct_attack), false);
 
         // => general nope loop
         // player order
@@ -235,7 +243,10 @@ mod tests {
 
     }
 
-    // TO DO: test noping on its own
-    // TO DO: test combos on its own
+    #[test]
+    fn test_combo_mechanism()
+    {
+
+    }
 
 }

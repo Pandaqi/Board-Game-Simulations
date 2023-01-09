@@ -1,8 +1,18 @@
 TO DO:
-* Combo helper functies (identificeren + strategie checken)
-* Combo uitvoering
-* De code en strategieën voor kiezen van slachtoffer (en kaart vragen)
+* TESTS voor de COMBO functies
+* NOPE: zie iets altijd als een directe aanval als je met twee spelers bent, of jij de enige andere speler met kaarten?
+* ATTACK: track hoeveel attacks er op elkaar zijn gespeeld in de state? (Eerste attack = repeating turns naar 1, daarna is het repeat_turns + num_attacks*2, wordt gereset zodra speler wisselt aan einde loop)
 * Meer speelstrategieën
+* Splits een aantal strategieën verder
+  * Splits combo in drie: kans op gebruiken/vragen, 2 of 3 voorkeur, katkaarten of alle kaarten voorkeur
+  * Splits nope in vier: kans op gebruiken/vragen, eventuele override, verdedigend nopen (in welke situatie gebruik je een Nope als je direct wordt aangevallen?), multinope
+  * Omgaan met toekomst bekijken => Altijd, Alleen als geen Defuse, Alleen als kan veranderen, Bewust een Future kaart _vragen_ aan het begin van je beurt
+  * Omgaan met de beurt _nadat_ iemand een Kitten heeft terug gestopt => Sowieso omzeilen, alleen omzeilen als weinig spelers over, alleen omzeilen als geen Defuse meer, soms omzeilen, niks om geven
+* Bij kiezen welke kaart je vraagt van iemand, ook wat andere strategieën meenemen.
+  * Dus als je die Attacks spaart, vraag dan ook naar Attacks
+  * Als jouw Future strategie belangrijk is, vraag naar Future
+  * Nieuwe strategie kaart vragen: alleen kitten-omzeil kaarten (maak Defuse de standaard?)
+  * (Ik doe dit al voor Nope en Combo.)
 * Algemeen
   * Breng de "fixed strategy player 0" code terug
   * Gebruik de debugger op iets meer plekken
@@ -38,13 +48,16 @@ X Gebruik ze alleen om een bestaande Nope te ontnopen, als dat een directe aanva
 X NOTE: Hoe agressiever je Nope-strategie, hoe groter de kans dat je die kaart probeert te _stelen_ van een ander.
 
 == COMBO ==
-Willekeurig = gebruik combokaarten met 10% kans
-Kans 0% (je doet er niks mee)
-Kans 25%
-Kans 50%
-Kans 75%
-Kans 100% (gebruik combo's meteen)
-Geef de voorkeur aan combo's van drie
+X Willekeurig = gebruik combokaarten met 10% kans
+X Kans 0% (je doet er niks mee)
+X Kans 25%
+X Kans 50%
+X Kans 75%
+X Kans 100% (gebruik combo's meteen)
+X Geef de voorkeur aan combo's van drie, soms
+X Geef de voorkeur aan combo's van drie, altijd
+X Gebruik alle kaarten (niet alleen katkaarten) voor combo's
+X Gebruik alle kaarten (niet alleen katkaarten) voor combo's van drie
 
 X NOTE: Hoe agressiever je Combo-strategie, hoe groter de kans dat je zo'n kaart probeert te _stelen_ van een ander.
 
@@ -57,34 +70,35 @@ X Speel nooit een kaart
 X Speel altijd een kaart.
 X Speel altijd zoveel kaarten als je kan.
 
+TO DO: Als je weet dat er een Kitten aankomt, eerst proberen om met Combo's/Favor kaarten te verkrijgen die misschien helpen => Hoe integreer je dit makkelijk? Is dit dan hetzelfde voor alle spelers?
+
 Spaar je kaarten tot het einde van het spel (2-3 spelers over, weinig kaarten)
-Spaar je kaarten totdat je meerdere Aanvalskaarten tegelijk kan doen
+Spaar je Attack en Skip kaarten tot het einde
 
-Als je een "bekijk de stapel" kaart hebt, speel die altijd eerst
-Als je een "bekijk de stapel" kaart hebt, speel die altijd eerst, maar alleen als je ook iets kan veranderen.
+Probeer geen kaart te trekken als de kans op een Kitten boven een bepaald percentage uitkomt. (Kan je makkelijk uitrekenen, want je weet hoeveel Kittens erin zitten en mag de stapel tellen volgens de regels.) => Ik kan daarvoor gewoon het deck tellen
 
+Speel altijd "bekijk de stapel"-kaart als eerste, mits je iets kan veranderen.
+Speel alleen "bekijk de stapel"-kaarten als je onveilig bent (geen Defuse meer)
 
 Spaar je kaarten op, zodat je in één keer alles op iemand anders kan gooien. (Vooral van toepassing op Attack kaarten.)
 
 Als je een manier hebt om kaarten te stelen van een ander, gebruik die altijd.
 Als je een manier hebt om kaarten te stelen van een ander, gebruik die nooit.
-Als de vorige speler geen kaart heeft getrokken, probeer dan zelf ook geen kaart te trekken
-Bluf: zelfs als je weet dat er geen Kitten aankomt, doe alsof je bang bent en deze moet omzeilen.
-Probeer geen kaart te trekken als de kans op een Kitten boven een bepaald percentage uitkomt. (Kan je makkelijk uitrekenen, want je weet hoeveel Kittens erin zitten en mag de stapel tellen volgens de regels.)
-Wees agressief aan het begin van het spel en defensief aan het einde
-Wees defensief aan het begin van het spel en agressief aan het einde
+
+Copycat: Als de vorige speler geen kaart heeft getrokken, probeer dan zelf ook geen kaart te trekken
+Bluf: als je "see the future" aangeeft dat er géén kitten aankomt, speel alsnog een kaart alsof dat wél zo is.
+StartHoard: begin het spel met zoveel mogelijk kaarten verzamelen, en dan halverwege stop je volledig en reageert alleen als nodig
 
 == SLACHTOFFER KIEZEN ==
-Willekeurig persoon en willekeurige kaart.
-Willekeurig persoon en Defuse kaart.
-Vraag altijd om een Defuse kaart. Kies de persoon die de meeste kans heeft deze te hebben. (Dit is publieke informatie als je een acceptabel geheugen hebt: wie al is ontploft of niet.)
-Vraag om een kaart voor je combo's.
-Vraag om een Nope kaart.
-Kies één slachtoffer aan het begin en blijf die het hele spel lang kiezen.
-Kies steeds een ander slachtoffer dan je vorige
-Val de speler aan met de minste kaarten.
-Val de speler aan met de meeste kaarten.
-Val alleen mensen aan die eerst jou hebben aangevallen
+X Willekeurig persoon en willekeurige kaart.
+X Willekeurig persoon en Defuse kaart.
+X Vraag altijd om een Defuse kaart. Kies de persoon die de meeste kans heeft deze te hebben. (Dit is publieke informatie als je een acceptabel geheugen hebt: wie al is ontploft of niet.)
+X Val de speler aan met de minste kaarten.
+X Val de speler aan met de meeste kaarten.
+X Val de speler vóór jou aan.
+X Val de speler ná jou aan.
+X Kies één slachtoffer aan het begin en blijf die het hele spel lang kiezen.
+X Kies steeds een ander slachtoffer dan je vorige
 
 == TERUG STOPPEN ==
 X Willekeurig

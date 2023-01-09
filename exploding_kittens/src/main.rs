@@ -13,6 +13,9 @@ mod helpers;
 mod test;
 mod strats;
 
+mod combos;
+mod nope;
+
 fn main() {
     let sim_config = SimConfig::new();
     let sim_results = Simulator::simulate(&sim_config);

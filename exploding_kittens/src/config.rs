@@ -38,13 +38,13 @@ impl SimConfig
     pub fn new() -> Self
     {
         Self {
-            file_prefix: "second_test".to_string(),
-            num_iterations: 1000,
+            file_prefix: "third_test".to_string(),
+            num_iterations: 1,
             print_interval: 1000,
             player_count: 4,
             randomize_player_count: true,
-            create_images: true,
-            print_gameplay: false,
+            create_images: false,
+            print_gameplay: true,
             track_per_player: false,
         }
     }

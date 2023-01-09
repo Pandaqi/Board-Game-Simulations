@@ -1,6 +1,6 @@
 use rand::{Rng, seq::SliceRandom};
 
-use crate::{config::{SimConfig, StratListStruct}, results::SimResults, helpers::{Helpers, CARD_DATA}, simulator::Simulator, strats::{Card, Strat, Hand, StratKitten, StratPlay, StratVictim, Combo}};
+use crate::{config::{SimConfig, StratListStruct}, results::SimResults, helpers::{Helpers, CARD_DATA}, simulator::Simulator, strats::{Card, Strat, Hand, StratKitten, StratPlay, StratVictim, Combo}, combos::Combos, nope::Nope};
 
 pub struct Debugger {
     pub enabled: bool
@@ -12,6 +12,11 @@ impl Debugger
     {
         if !self.enabled { return; }
         println!("{:#?}", txt);
+    }
+
+    fn println(&self)
+    {
+        println!("");
     }
 }
 
@@ -32,7 +37,9 @@ pub struct GameState {
     pub saw_future: bool,
     pub will_draw_kitten: bool,
     pub cards_played: usize,
-    pub prev_exploded: bool
+    pub prev_exploded: bool,
+    pub exploded: Vec<bool>,
+    pub prev_victim: Vec<usize>
 }
 
 impl GameState
@@ -45,10 +52,18 @@ impl GameState
             saw_future: false,
             will_draw_kitten: false,
             cards_played: 0,
-            prev_exploded: false
+            prev_exploded: false,
+            exploded: Vec::new(),
+            prev_victim: Vec::new()
         }
     }
 
+    pub fn init(&mut self, player_count:usize)
+    {
+        self.exploded = vec![false; player_count];
+        self.prev_victim = vec![10; player_count];
+    }
+    
     // resets everything that is NOT kept between turns
     // (those are: repeat_turns, prev_exploded)
     pub fn reset(&mut self)
@@ -91,11 +106,13 @@ impl Game
 
         let mut game_is_over: bool = false;
         let mut cur_player: usize = Helpers::get_random_start_player(player_count);
+        
         let mut state = GameState::new();
+        state.init(player_count);
 
         let debugger = Debugger { enabled: cfg.print_gameplay };
 
-        debugger.print(" ");
+        debugger.println();
         debugger.print("== NEW GAME ==");
         debugger.print(&strategies);
         debugger.print(&hands);
@@ -104,7 +121,7 @@ impl Game
         {
             cur_player = cur_player % players_alive.len();
 
-            debugger.print(" ");
+            debugger.println();
             debugger.print("= NEW TURN =");
             debugger.print("Current player?");
             debugger.print(cur_player);
@@ -123,11 +140,11 @@ impl Game
             {
                 DrawResult::Death => { 
                     debugger.print("Draw => death");
-                    Game::kill_player(cur_player, &mut hands, &mut players_alive, &mut strategies); 
+                    Game::kill_player(cur_player, &mut hands, &mut players_alive, &mut strategies, &mut state); 
                 }
                 DrawResult::Defuse => { 
                     debugger.print("Draw => Defuse");
-                    Game::put_back_kitten(cur_player, &hands, &mut deck, &strategies[cur_player]); 
+                    Game::put_back_kitten(cur_player, &hands, &mut deck, &strategies[cur_player], &state); 
                 }
                 _ => { }
             }
@@ -153,11 +170,13 @@ impl Game
         Simulator::save_results(res, winning_player, winning_strategy);
     }
 
-    pub fn kill_player(num:usize, hands:&mut Vec<Hand>, players_alive:&mut Vec<usize>, strategies:&mut Vec<Strat>)
+    pub fn kill_player(num:usize, hands:&mut Vec<Hand>, players_alive:&mut Vec<usize>, strategies:&mut Vec<Strat>, state: &mut GameState)
     {
         hands.remove(num);
         strategies.remove(num);
         players_alive.remove(num);
+        state.exploded.remove(num);
+        state.prev_victim.remove(num);
     }
 
     fn play_cards(num:usize, hands:&mut Vec<Hand>, deck:&mut Vec<Card>, strategies:&Vec<Strat>, state:&mut GameState, debugger:&Debugger)
@@ -174,8 +193,6 @@ impl Game
             debugger.print("Chosen cards to play");
             debugger.print(&cards_to_play);
 
-            // TO DO: needs special care for combos
-
             // play the chosen cards
             while cards_to_play.len() > 0
             {
@@ -183,7 +200,7 @@ impl Game
                 let success = Game::execute_card(num, hands, combo, deck, strategies, state);
                 if !success { continue; }
 
-                for i in 0..combo.1
+                for _i in 0..combo.1
                 {
                     let idx = hands[num].iter().position(|c| *c == combo.0).unwrap();
                     hands[num].remove(idx);
@@ -195,9 +212,6 @@ impl Game
             debugger.print("Remaining hand");
             debugger.print(&hands[num]);
         }
-            
-        // TO DO: Check if we HAVE combos. Then check our strategy for what to do with it
-        // TO DO: for every card, it must check if other players want to nope it. (Discard early if they don't have nope cards or their strategy won't use them anyway)
     }
 
     pub fn wants_to_continue_turn(num:usize, hands:&Vec<Hand>, strat:&Strat, state:&GameState) -> bool
@@ -259,9 +273,9 @@ impl Game
         if playable_hand.len() <= 0 { return cards_to_play; }
 
         // COMBO CHECKER
-        let play_combo:bool = false;
-        let combo:Option<Combo> = Helpers::get_combo(&playable_hand);
-        if combo.is_some() { play_combo = Helpers::want_to_play_combo(combo.unwrap(), strat); }
+        let mut play_combo:bool = false;
+        let combo:Option<Combo> = Combos::get_combo(&playable_hand, strat);
+        if combo.is_some() { play_combo = Combos::want_to_play_combo(combo.unwrap(), strat); }
         if play_combo { 
             cards_to_play.push(combo.unwrap()); 
             return cards_to_play;
@@ -269,18 +283,19 @@ impl Game
         
         // if we don't play a combo, those cards are useless now
         // onwards, _exclude_ those cards from the playable hand 
-        playable_hand = Helpers::remove_combo_cards(&playable_hand);
+        playable_hand = Combos::remove_combo_cards(&playable_hand);
+        if playable_hand.len() <= 0 { return cards_to_play; }
 
         // otherwise let our strategy decide
+        // TO DO
         match strat.play
         {
-            StratPlay::Random => {
+            _ => { 
                 let range = 0..playable_hand.len();
                 let rand_idx = rng.gen_range(range);
                 cards_to_play.push((playable_hand[rand_idx], 1));
                 playable_hand.remove(rand_idx);
             }
-            _ => { }
         }
 
         return cards_to_play;
@@ -308,7 +323,7 @@ impl Game
                 let mut direct_attack = Helpers::is_direct_attack(num, idx, card, hands.len());
                 if nope_active { direct_attack = idx == num; } // but we can un-nope ourself
                 
-                if Helpers::opponent_will_nope(idx, card, hands, &strategies[idx], direct_attack) {
+                if Nope::opponent_will_nope(idx, card, hands, &strategies[idx], direct_attack) {
                     let nope_card_idx = hands[idx].iter().position(|c| *c == Card::Nope).unwrap();
                     hands[idx].remove(nope_card_idx);
                     num_nopes += 1;
@@ -334,8 +349,18 @@ impl Game
 
         let strat = strategies[num];
 
-        // TO DO: properly execute COMBO cards (if second number = 2 steal, if second number = 3 steal with request)
+        // check combos
+        if combo.1 == 2
+        {
+            Game::steal_card(num, hands, &strat, state, false);
+        }
 
+        if combo.1 == 3
+        {
+            Game::steal_card(num, hands, &strat, state, true);
+        }
+
+        // otherwise check the card on its own
         match combo.0
         {
             Card::Skip => { state.skip_draw = true; }
@@ -345,11 +370,12 @@ impl Game
                 state.will_draw_kitten = false;
             }
             Card::Favor => {
-                Game::steal_card(num, hands, &strat);
+                Game::steal_card(num, hands, &strat, state, false);
             }
             Card::Attack => { 
                 state.skip_draw = true;
-                state.repeat_turns += 2;
+                if state.repeat_turns == 0 { state.repeat_turns = 1; }
+                else { state.repeat_turns += 2; }
             }
             Card::Future => {
                 let start = (deck.len() as i32 - 3).max(0) as usize;
@@ -368,9 +394,10 @@ impl Game
         return true;
     }
 
-    pub fn steal_card(num:usize, hands:&mut Vec<Hand>, strat:&Strat)
+    pub fn steal_card(num:usize, hands:&mut Vec<Hand>, strat:&Strat, state:&mut GameState, need_to_request_card:bool)
     {
         // only consider players that are not us AND that have cards
+        let player_count = hands.len();
         let mut other_players:Vec<usize> = (0..hands.len()).collect();
         other_players.remove(num);
 
@@ -386,35 +413,82 @@ impl Game
 
         let mut rng = rand::thread_rng();
 
-        let mut idx: usize = 0;
-        let need_to_request_card: bool = true; // TO DO: should be given when combo is of size 3
-        let mut requested_card: Option<Card> = None;
+        // NOTE: this variable is the REAL index of the player, not the idx in the "other_players" array
+        let mut idx: usize = *other_players.choose(&mut rng).unwrap();
+        let mut requested_card:Card = Helpers::get_random_card();
 
-        if need_to_request_card && Helpers::request_nope_based_on_strategy(strat.nope)
+        if need_to_request_card && Nope::request_based_on_strategy(strat.nope)
         {
-            requested_card = Some(Card::Nope);
+            requested_card = Card::Nope;
         }
 
-        if need_to_request_card && Helpers::request_combo_based_on_strategy(strat.combo)
+        if need_to_request_card && Combos::request_based_on_strategy(strat.combo)
         {
-            // TO DO: count the one we have the most, request that
-            requested_card = Some(Card::Tacocat);
+            requested_card = Combos::pick_card_to_steal(&hands[num], strat.combo);
         }
 
+        // TO DO: The PickOne and PickDiverse strats aren't 100% correct, because indices of players CHANGE as players are killed ...
         match strat.victim
         {
-            StratVictim::Random => { 
-                idx = *other_players.choose(&mut rng).unwrap(); 
+            StratVictim::Defuse => { requested_card = Card::Defuse; }
+            StratVictim::DefuseProb => { 
+                requested_card = Card::Defuse;
+
+                for (k,v) in state.exploded.iter().enumerate()
+                {
+                    if !other_players.contains(&k) { continue; }
+                    if *v { continue } // they are exploded, so they likely WON'T have a defuse card
+                    idx = k; 
+                    break;
+                }
             }
+            StratVictim::MostCards => { idx = Helpers::get_player_with_most_cards(other_players, &hands); }
+            StratVictim::LeastCards => { idx = Helpers::get_player_with_least_cards(other_players, &hands); }
+            
+            StratVictim::SeatAfter => { 
+                let new_idx = (num + 1) % player_count; 
+                if other_players.contains(&new_idx) { idx = new_idx; }
+            }
+
+            StratVictim::SeatBefore => { 
+                let new_idx = (num + player_count - 1) % player_count; 
+                if other_players.contains(&new_idx) { idx = new_idx; }
+            }
+            
+            StratVictim::PickOne => { 
+                let prev_victim = state.prev_victim[num];
+                let mut new_victim = prev_victim;
+                if !other_players.contains(&new_victim) { new_victim = idx; }
+                idx = new_victim;
+                state.prev_victim[num] = new_victim;
+            }
+            StratVictim::PickDiverse => {
+                let prev_victim = state.prev_victim[num];
+                if !other_players.contains(&prev_victim) || idx == prev_victim 
+                { 
+                    for v in other_players.iter()
+                    {
+                        if *v == prev_victim { continue; }
+                        idx = *v;
+                        break;
+                    }
+                }
+                state.prev_victim[num] = idx;
+            }
+            _ => {}
         }
 
-        
+        // get index of requested card, or do nothing if the other player doesn't have it
+        let mut steal_idx = rng.gen_range(0..hands[idx].len());
+        if need_to_request_card
+        {
+            if !hands[idx].contains(&requested_card) { return; }
+            steal_idx = hands[idx].iter().position(|c| *c == requested_card).unwrap();
+        }
 
-        let steal_idx = rng.gen_range(0..hands[idx].len());
+        // finally, remove the card from our victim, add it to our hand
         let stolen_card = hands[idx].remove(steal_idx);
         hands[num].push(stolen_card);
-
-        // TO DO: take the special case with requested cards into account (3-catcard-combo)
     }
 
     pub fn draw_card(num:usize, hands:&mut Vec<Hand>, deck:&mut Vec<Card>, debugger:&Debugger) -> DrawResult
@@ -437,7 +511,7 @@ impl Game
     }
 
     // Deck is a stack: last item is top, and drawn first
-    pub fn put_back_kitten(num:usize, hands:&Vec<Hand>, deck:&mut Vec<Card>, strats:&Strat)
+    pub fn put_back_kitten(num:usize, hands:&Vec<Hand>, deck:&mut Vec<Card>, strats:&Strat, state:&GameState)
     {
         let mut rng = rand::thread_rng();
         let player_count = hands.len();
@@ -463,9 +537,12 @@ impl Game
             _ => { }
         }
 
+        // take into account how many turns we still have to do
+        let max_idx:i32 = (deck_size - (state.repeat_turns as i32)).max(0);
+
         // NOTE: we need to allow index of deck_size (instead of deck_size-1 as maximum)
         // as inserting at the end means using that index
-        let final_idx = idx.clamp(0, deck_size) as usize;
+        let final_idx = idx.clamp(0, max_idx) as usize;
         deck.insert(final_idx, Card::Kitten);
     }
 

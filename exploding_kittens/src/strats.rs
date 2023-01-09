@@ -95,7 +95,9 @@ pub enum StratCombo {
     Often,
     Always,
     ThreesSometimes,
-    ThreesAlways
+    ThreesAlways,
+    AllCards,
+    AllCardsThrees
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Sequence)]
@@ -110,7 +112,15 @@ pub enum StratKitten {
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Sequence)]
 pub enum StratVictim {
-    Random
+    Random,
+    Defuse,
+    DefuseProb,
+    MostCards,
+    LeastCards,
+    SeatBefore,
+    SeatAfter,
+    PickOne,
+    PickDiverse
 }
 
 // TO DO: figure out a way to make this call ONCE for all appropriate enums
