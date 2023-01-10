@@ -1,5 +1,6 @@
 use crate::strats::{StratPlay, StratNope, StratCombo, StratKitten, StratVictim};
 
+/*
 pub struct StratListStruct {
     pub play: Vec<StratPlay>,
     pub nope: Vec<StratNope>,
@@ -21,6 +22,7 @@ impl StratListStruct
         }
     }
 }
+ */
 
 pub struct SimConfig {
     pub file_prefix: String,
@@ -38,13 +40,13 @@ impl SimConfig
     pub fn new() -> Self
     {
         Self {
-            file_prefix: "third_test".to_string(),
+            file_prefix: "enum_rewrite".to_string(),
             num_iterations: 1,
             print_interval: 1000,
             player_count: 4,
             randomize_player_count: true,
-            create_images: false,
-            print_gameplay: true,
+            create_images: true,
+            print_gameplay: false,
             track_per_player: false,
         }
     }

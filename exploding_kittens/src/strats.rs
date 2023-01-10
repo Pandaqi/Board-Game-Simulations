@@ -1,13 +1,10 @@
-use std::fmt;
+use std::{fmt, collections::HashMap};
 
 use enum_iterator::Sequence;
-use rand::seq::SliceRandom;
-
-use crate::config::StratListStruct;
-
 pub type Combo = (Card, usize);
 
 // The strategy a specific player is using
+/*
 #[derive(Copy, Clone, Debug)]
 pub struct Strat {
     pub play: StratPlay,
@@ -29,6 +26,25 @@ impl Strat
             kitten: *options.kitten.choose(&mut rng).unwrap(),
             victim: *options.victim.choose(&mut rng).unwrap()
         }
+    }
+}
+ */
+
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Sequence)]
+pub enum Strategy {
+    Play(StratPlay),
+    Nope(StratNope),
+    Combo(StratCombo),
+    Kitten(StratKitten),
+    Victim(StratVictim)
+}
+
+pub type Strat = HashMap<String, Strategy>;
+pub type StratList = HashMap<String, Vec<Strategy>>;
+
+impl fmt::Display for Strategy {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(self, f)
     }
 }
 
@@ -121,35 +137,4 @@ pub enum StratVictim {
     SeatAfter,
     PickOne,
     PickDiverse
-}
-
-// TO DO: figure out a way to make this call ONCE for all appropriate enums
-impl fmt::Display for StratPlay {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Debug::fmt(self, f)
-    }
-}
-
-impl fmt::Display for StratNope {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Debug::fmt(self, f)
-    }
-}
-
-impl fmt::Display for StratCombo {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Debug::fmt(self, f)
-    }
-}
-
-impl fmt::Display for StratKitten {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Debug::fmt(self, f)
-    }
-}
-
-impl fmt::Display for StratVictim {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Debug::fmt(self, f)
-    }
 }

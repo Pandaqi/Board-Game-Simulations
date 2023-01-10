@@ -1,0 +1,9 @@
+[package]
+name = "testing_rust"
+description = "Used to learn new features of the Rust language, before applying them"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]

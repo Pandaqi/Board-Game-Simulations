@@ -1,6 +1,6 @@
 use rand::{Rng, seq::SliceRandom};
 
-use crate::{config::{SimConfig, StratListStruct}, results::SimResults, helpers::{Helpers, CARD_DATA}, simulator::Simulator, strats::{Card, Strat, Hand, StratKitten, StratPlay, StratVictim, Combo}, combos::Combos, nope::Nope};
+use crate::{config::{SimConfig}, results::SimResults, helpers::{Helpers, CARD_DATA}, simulator::Simulator, strats::{Card, Strat, Hand, StratKitten, StratPlay, StratVictim, Combo, Strategy, StratList}, combos::Combos, nope::Nope};
 
 pub struct Debugger {
     pub enabled: bool
@@ -16,6 +16,7 @@ impl Debugger
 
     fn println(&self)
     {
+        if !self.enabled { return; }
         println!("");
     }
 }
@@ -166,7 +167,7 @@ impl Game
         }
 
         let winning_player = players_alive[0];
-        let winning_strategy:Strat = strategies[0];
+        let winning_strategy:Strat = strategies[0].clone();
         Simulator::save_results(res, winning_player, winning_strategy);
     }
 
@@ -181,7 +182,7 @@ impl Game
 
     fn play_cards(num:usize, hands:&mut Vec<Hand>, deck:&mut Vec<Card>, strategies:&Vec<Strat>, state:&mut GameState, debugger:&Debugger)
     {
-        let strat = strategies[num];
+        let strat = &strategies[num];
 
         loop
         {
@@ -228,22 +229,24 @@ impl Game
 
         let mut rng = rand::thread_rng();
         let mut keep_playing:bool = false;
+        let play_strat = *strat.get("play").unwrap();
 
-        match strat.play
+        match play_strat
         {
-            StratPlay::Random => { 
+            Strategy::Play(StratPlay::Random) => { 
                 keep_playing = rng.gen::<f64>() <= 0.5;
             }
 
-            StratPlay::Never => { keep_playing = false; }
-            StratPlay::One => { keep_playing = state.cards_played == 0; }
-            StratPlay::All => { keep_playing = true; }
-            StratPlay::OnlyAfterKitten => { 
+            Strategy::Play(StratPlay::Never) => { keep_playing = false; }
+            Strategy::Play(StratPlay::One) => { keep_playing = state.cards_played == 0; }
+            Strategy::Play(StratPlay::All) => { keep_playing = true; }
+            Strategy::Play(StratPlay::OnlyAfterKitten) => { 
                 keep_playing = state.prev_exploded && state.cards_played <= 0;
             }
-            StratPlay::NotIfSafe => {
+            Strategy::Play(StratPlay::NotIfSafe) => {
                 keep_playing = !hands[num].contains(&Card::Defuse) && state.cards_played <= 0;
             }
+            _ => {}
         }
 
         return keep_playing;
@@ -287,8 +290,9 @@ impl Game
         if playable_hand.len() <= 0 { return cards_to_play; }
 
         // otherwise let our strategy decide
-        // TO DO
-        match strat.play
+        // TO DO => this is incorrect right now, because it considers ALL strategies, not just the play ones right?
+        let play_strat = *strat.get("play").unwrap();
+        match play_strat
         {
             _ => { 
                 let range = 0..playable_hand.len();
@@ -347,7 +351,7 @@ impl Game
         let was_noped = Game::was_noped(num, hands, combo, strategies);
         if was_noped { return true; } // nope destroys the original card, even though it was never "played"
 
-        let strat = strategies[num];
+        let strat = &strategies[num];
 
         // check combos
         if combo.1 == 2
@@ -417,21 +421,25 @@ impl Game
         let mut idx: usize = *other_players.choose(&mut rng).unwrap();
         let mut requested_card:Card = Helpers::get_random_card();
 
-        if need_to_request_card && Nope::request_based_on_strategy(strat.nope)
+        let nope_strat = *strat.get("nope").unwrap();
+        let combo_strat = *strat.get("combo").unwrap();
+
+        if need_to_request_card && Nope::request_based_on_strategy(nope_strat)
         {
             requested_card = Card::Nope;
         }
 
-        if need_to_request_card && Combos::request_based_on_strategy(strat.combo)
+        if need_to_request_card && Combos::request_based_on_strategy(combo_strat)
         {
-            requested_card = Combos::pick_card_to_steal(&hands[num], strat.combo);
+            requested_card = Combos::pick_card_to_steal(&hands[num], combo_strat);
         }
 
         // TO DO: The PickOne and PickDiverse strats aren't 100% correct, because indices of players CHANGE as players are killed ...
-        match strat.victim
+        let victim_strat = *strat.get("victim").unwrap();
+        match victim_strat
         {
-            StratVictim::Defuse => { requested_card = Card::Defuse; }
-            StratVictim::DefuseProb => { 
+            Strategy::Victim(StratVictim::Defuse) => { requested_card = Card::Defuse; }
+            Strategy::Victim(StratVictim::DefuseProb) => { 
                 requested_card = Card::Defuse;
 
                 for (k,v) in state.exploded.iter().enumerate()
@@ -442,27 +450,27 @@ impl Game
                     break;
                 }
             }
-            StratVictim::MostCards => { idx = Helpers::get_player_with_most_cards(other_players, &hands); }
-            StratVictim::LeastCards => { idx = Helpers::get_player_with_least_cards(other_players, &hands); }
+            Strategy::Victim(StratVictim::MostCards) => { idx = Helpers::get_player_with_most_cards(other_players, &hands); }
+            Strategy::Victim(StratVictim::LeastCards) => { idx = Helpers::get_player_with_least_cards(other_players, &hands); }
             
-            StratVictim::SeatAfter => { 
+            Strategy::Victim(StratVictim::SeatAfter) => { 
                 let new_idx = (num + 1) % player_count; 
                 if other_players.contains(&new_idx) { idx = new_idx; }
             }
 
-            StratVictim::SeatBefore => { 
+            Strategy::Victim(StratVictim::SeatBefore) => { 
                 let new_idx = (num + player_count - 1) % player_count; 
                 if other_players.contains(&new_idx) { idx = new_idx; }
             }
             
-            StratVictim::PickOne => { 
+            Strategy::Victim(StratVictim::PickOne) => { 
                 let prev_victim = state.prev_victim[num];
                 let mut new_victim = prev_victim;
                 if !other_players.contains(&new_victim) { new_victim = idx; }
                 idx = new_victim;
                 state.prev_victim[num] = new_victim;
             }
-            StratVictim::PickDiverse => {
+            Strategy::Victim(StratVictim::PickDiverse) => {
                 let prev_victim = state.prev_victim[num];
                 if !other_players.contains(&prev_victim) || idx == prev_victim 
                 { 
@@ -524,16 +532,17 @@ impl Game
         }
 
         let mut idx:i32 = rng.gen_range(range) as i32;
-        match strats.kitten
+        let kitten_strat = *strats.get("kitten").unwrap();
+        match kitten_strat
         {
-            StratKitten::Top => { idx = deck_size; }
-            StratKitten::TopSecond => { idx = deck_size - 1; }
-            StratKitten::TopFourth => { idx = deck_size - 3; }
-            StratKitten::TopCond => { 
+            Strategy::Kitten(StratKitten::Top) => { idx = deck_size; }
+            Strategy::Kitten(StratKitten::TopSecond) => { idx = deck_size - 1; }
+            Strategy::Kitten(StratKitten::TopFourth) => { idx = deck_size - 3; }
+            Strategy::Kitten(StratKitten::TopCond) => { 
                 let next_player = (num + 1) % player_count;
                 if hands[next_player].len() <= 3 { idx = deck_size; }
             }
-            StratKitten::Bottom => { idx = 0; }
+            Strategy::Kitten(StratKitten::Bottom) => { idx = 0; }
             _ => { }
         }
 
@@ -546,12 +555,12 @@ impl Game
         deck.insert(final_idx, Card::Kitten);
     }
 
-    pub fn generate_random_strategies(player_count:usize, options:&StratListStruct) -> Vec<Strat>
+    pub fn generate_random_strategies(player_count:usize, options:&StratList) -> Vec<Strat>
     {
         let mut strats:Vec<Strat> = Vec::new();
         for _i in 0..player_count
         {
-            strats.push(Strat::new_random(options));
+            strats.push(Helpers::generate_random_strategy(&options));
         }
         return strats;
     }

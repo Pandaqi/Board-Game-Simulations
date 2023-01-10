@@ -1,6 +1,22 @@
 #[cfg(test)]
 mod tests {
-    use crate::{game::{Game, DrawResult, GameState, Debugger}, helpers::Helpers, strats::{StratPlay, StratKitten, Card, Strat, Hand, StratNope}, simulator::Simulator, nope::Nope};
+    use enum_iterator::all;
+
+    use crate::{game::{Game, DrawResult, GameState, Debugger}, helpers::Helpers, strats::{StratPlay, StratKitten, Card, Strat, Hand, StratNope, Strategy, StratVictim}, simulator::Simulator, nope::Nope};
+
+    #[test]
+    fn test_rust_functionality()
+    {
+        let fields_auto = all::<Strategy>().collect::<Vec<_>>();
+        println!("{:#?}", fields_auto);
+        assert_eq!(fields_auto.contains(&Strategy::Victim(StratVictim::PickOne)), true);
+
+        assert_eq!(matches!(Strategy::Victim(StratVictim::PickOne), Strategy::Victim(_)), true);
+        assert_eq!(
+            std::mem::discriminant(&Strategy::Victim(StratVictim::Defuse)) == 
+            std::mem::discriminant(&Strategy::Victim(StratVictim::PickDiverse)
+        ), true);
+    }
 
     #[test]
     #[ignore]
@@ -36,7 +52,7 @@ mod tests {
     {
         let hands:Vec<Hand> = vec![vec![]];
         let options = Simulator::setup().options;
-        let strat = Strat::new_random(&options);
+        let strat = Helpers::generate_random_strategy(&options);
         let state = GameState::new();
         assert_eq!(Game::wants_to_continue_turn(0, &hands, &strat, &state), false);
     }
@@ -57,8 +73,8 @@ mod tests {
         let hands:Vec<Hand> = vec![vec![Card::Attack]];
         let options = Simulator::setup().options;
         let state = GameState::new();
-        let mut strat = Strat::new_random(&options);
-        strat.play = StratPlay::Random;
+        let mut strat = Helpers::generate_random_strategy(&options);
+        strat.insert("play".to_owned(), Strategy::Play(StratPlay::Random));
         assert_eq!(Game::pick_card_to_play(0, &hands, &strat, &state), vec![(Card::Attack, 1)]);
         assert_eq!(hands[0].len(), 1);
 
@@ -127,7 +143,7 @@ mod tests {
         let count:usize = 2;
         let mut hands:Vec<Hand> = vec![vec![], vec![]];
         let options = Simulator::setup().options;
-        let strat = Strat::new_random(&options);
+        let strat = Helpers::generate_random_strategy(&options);
         let mut state = GameState::new();
         state.init(count);
 
@@ -176,8 +192,8 @@ mod tests {
         let mut hands:Vec<Hand> = vec![vec![]];
         let mut deck:Vec<Card> = vec![Card::Nope, Card::Attack, Card::Skip];
         let options = Simulator::setup().options;
-        let mut strat = Strat::new_random(&options);
-        strat.kitten = StratKitten::Top;
+        let mut strat = Helpers::generate_random_strategy(&options);
+        strat.insert("kitten".to_owned(), Strategy::Kitten(StratKitten::Top));
         let state = GameState::new();
 
         // tests top strategy
@@ -192,7 +208,7 @@ mod tests {
         // tests top cond strategy
         hands = vec![vec![Card::Attack], vec![Card::Attack]];
         deck = vec![Card::Nope, Card::Attack, Card::Skip];
-        strat.kitten = StratKitten::TopCond;
+        strat.insert("kitten".to_owned(), Strategy::Kitten(StratKitten::TopCond));
         Game::put_back_kitten(0, &hands, &mut deck, &strat, &state);
         assert_eq!(*deck.last().unwrap(), Card::Kitten);
     }
@@ -205,8 +221,8 @@ mod tests {
         let card = Card::Attack;
         let mut hands:Vec<Hand> = vec![vec![Card::Attack], vec![Card::Nope]];
         let options = Simulator::setup().options;
-        let mut strat = Strat::new_random(&options);
-        strat.nope = StratNope::Always;
+        let mut strat = Helpers::generate_random_strategy(&options);
+        strat.insert("nope".to_owned(), Strategy::Nope(StratNope::Always));
 
         // => per player nope decisions
         // direct attack calculations
@@ -227,7 +243,7 @@ mod tests {
 
         // insta-nope by other player
         hands = vec![vec![Card::Attack], vec![Card::Nope]];
-        let mut strats = vec![strat, strat];
+        let mut strats = vec![strat.clone(), strat.clone()];
         let nope_result:bool = Game::was_noped(num, &mut hands, (Card::Attack, 1), &strats);
         assert_eq!(hands[1].len(), 0);
         assert_eq!(nope_result, true);
@@ -235,7 +251,7 @@ mod tests {
         // double nope
         // (both lose that card, but the end result is false = no noping)
         hands = vec![vec![Card::Attack, Card::Nope], vec![Card::Nope]];
-        strats[0].nope = StratNope::DeNopeDirect;
+        strats[0].insert("nope".to_owned(), Strategy::Nope(StratNope::DeNopeDirect));
         let nope_result:bool = Game::was_noped(num, &mut hands, (Card::Attack, 1), &strats);
         assert_eq!(nope_result, false);
         assert_eq!(hands[0].len(), 1);

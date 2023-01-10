@@ -1,6 +1,6 @@
 use rand::Rng;
 
-use crate::{strats::{Combo, StratCombo, Hand, Strat, Card}, helpers::{CARD_DATA, Helpers}};
+use crate::{strats::{Combo, StratCombo, Hand, Strat, Card, Strategy}, helpers::{CARD_DATA, Helpers}};
 
 pub struct Combos {}
 
@@ -11,17 +11,25 @@ impl Combos
         return CARD_DATA[card].combo;
     }
 
-    pub fn use_any_card(strat:StratCombo) -> bool
+    pub fn use_any_card(strat:Strategy) -> bool
     {
-        return strat == StratCombo::AllCards || strat == StratCombo::AllCardsThrees;
+        return strat == Strategy::Combo(StratCombo::AllCards) 
+            || strat == Strategy::Combo(StratCombo::AllCardsThrees);
+    }
+
+    pub fn wait_for_threes(strat:Strategy) -> bool
+    {
+        return strat == Strategy::Combo(StratCombo::ThreesSometimes) 
+            || strat == Strategy::Combo(StratCombo::ThreesAlways)
+            || strat == Strategy::Combo(StratCombo::AllCardsThrees);
     }
 
     pub fn get_combo(cards:&Hand, strat:&Strat) -> Option<Combo>
     {
-        let wait_for_threes = strat.combo == StratCombo::ThreesSometimes || strat.combo == StratCombo::ThreesAlways || strat.combo == StratCombo::AllCardsThrees;
-        let match_value = if wait_for_threes { 3 } else { 2 };
+        let combo_strat = *strat.get("combo").unwrap();
+        let match_value = if Combos::wait_for_threes(combo_strat) { 3 } else { 2 };
 
-        let only_use_cat_cards = !Combos::use_any_card(strat.combo);
+        let only_use_cat_cards = !Combos::use_any_card(combo_strat);
 
         let freqs = Helpers::create_frequency_map(cards);
         let mut choice:Option<Combo> = None;
@@ -39,7 +47,7 @@ impl Combos
         return choice;
     }
 
-    pub fn pick_card_to_steal(hand:&Hand, strat:StratCombo) -> Card
+    pub fn pick_card_to_steal(hand:&Hand, strat:Strategy) -> Card
     {
         let only_use_cat_cards = !Combos::use_any_card(strat);
         let freqs = Helpers::create_frequency_map(hand);
@@ -59,27 +67,29 @@ impl Combos
 
     pub fn want_to_play_combo(combo:Combo, strat:&Strat) -> bool
     {
-        let wait_for_threes = strat.combo == StratCombo::ThreesSometimes || strat.combo == StratCombo::ThreesAlways;
+        let combo_strat = *strat.get("combo").unwrap();
+        let wait_for_threes = Combos::wait_for_threes(combo_strat);
         if wait_for_threes && combo.1 != 3 { return false; }
 
         // TO DO: does it matter WHAT cards you're using for the combo? (Only cat cards, never special cards, etc.)
 
-        return Combos::request_based_on_strategy(strat.combo);
+        return Combos::request_based_on_strategy(combo_strat);
     }
 
-    pub fn request_based_on_strategy(strat:StratCombo) -> bool
+    pub fn request_based_on_strategy(strat:Strategy) -> bool
     {
         let mut prob:f64 = 0.0;
         let mut rng = rand::thread_rng();
         match strat
         {
-            StratCombo::Random => { prob = 0.33; }
-            StratCombo::Never => { prob = 0.0; }
-            StratCombo::Rarely => { prob = 0.25; }
-            StratCombo::Sometimes | StratCombo::ThreesSometimes => { prob = 0.5; }
-            StratCombo::Often => { prob = 0.75; }
-            StratCombo::Always | StratCombo::ThreesAlways => { prob = 1.0; }
-            StratCombo::AllCards | StratCombo::AllCardsThrees => { prob = 0.33; }
+            Strategy::Combo(StratCombo::Random) => { prob = 0.33; }
+            Strategy::Combo(StratCombo::Never) => { prob = 0.0; }
+            Strategy::Combo(StratCombo::Rarely) => { prob = 0.25; }
+            Strategy::Combo(StratCombo::Sometimes) | Strategy::Combo(StratCombo::ThreesSometimes) => { prob = 0.5; }
+            Strategy::Combo(StratCombo::Often) => { prob = 0.75; }
+            Strategy::Combo(StratCombo::Always) | Strategy::Combo(StratCombo::ThreesAlways) => { prob = 1.0; }
+            Strategy::Combo(StratCombo::AllCards) | Strategy::Combo(StratCombo::AllCardsThrees) => { prob = 0.33; }
+            _ => {}
         }
         return rng.gen::<f64>() <= prob;
     }

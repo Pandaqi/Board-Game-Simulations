@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use rand::{Rng, seq::{SliceRandom, IteratorRandom}};
 
-use crate::strats::{CardData, Card, Hand, Strat, StratNope, StratCombo};
+use crate::{strats::{CardData, Card, Hand, Strat, StratList, Strategy}};
 
 lazy_static! {
     pub static ref CARD_DATA:HashMap<Card, CardData> = HashMap::from([
@@ -27,6 +27,17 @@ pub struct Helpers {}
 
 impl Helpers 
 {
+    pub fn create_enum_match_list(full:&Vec<Strategy>, key:Strategy) -> Vec<Strategy>
+    {
+        let mut arr:Vec<Strategy> = Vec::new();
+        for v in full.iter()
+        {
+            if std::mem::discriminant(v) != std::mem::discriminant(&key) { continue; }
+            arr.push(v.clone());
+        }
+        return arr;
+    }
+
     pub fn generate_deck() -> Vec<Card>
     {
         // generate full deck
@@ -118,6 +129,17 @@ impl Helpers
         return player_order;
     }
 
+    pub fn generate_random_strategy(options:&StratList) -> Strat
+    {
+        let mut rng = rand::thread_rng();
+        let mut strat:Strat = HashMap::new();
+        for (k,v) in options.iter()
+        {
+            strat.insert(k.clone(), *v.choose(&mut rng).unwrap());
+        }
+        return strat;
+    }
+
     pub fn get_random_start_player(player_count:usize) -> usize
     {
         let mut rng = rand::thread_rng();
@@ -169,6 +191,19 @@ impl Helpers
         for v in list.iter()
         {
             arr.push(v.to_string());
+        }
+        return arr;
+    }
+
+    pub fn extract_inside_parentheses(list:Vec<String>) -> Vec<String>
+    {
+        let mut arr:Vec<String> = Vec::new();
+        for v in list.iter()
+        {
+            let start_bytes = v.find("(").unwrap_or(0)+1;
+            let end_bytes = v.find(")").unwrap_or(v.len());
+            let result = &v[start_bytes..end_bytes];
+            arr.push(result.to_owned());
         }
         return arr;
     }

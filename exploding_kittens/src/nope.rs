@@ -1,23 +1,23 @@
 use rand::Rng;
 
-use crate::strats::{StratNope, Card, Hand, Strat};
+use crate::strats::{StratNope, Card, Hand, Strat, Strategy};
 
 pub struct Nope {}
 
 impl Nope
 {
-    pub fn request_based_on_strategy(strat:StratNope) -> bool
+    pub fn request_based_on_strategy(strat:Strategy) -> bool
     {
         let mut prob:f64 = 0.0;
         let mut rng = rand::thread_rng();
         match strat
         {
-            StratNope::Random => { prob = 0.1; }
-            StratNope::Never => { prob = 0.0; }
-            StratNope::Rarely => { prob = 0.25; }
-            StratNope::Sometimes => { prob = 0.5; }
-            StratNope::Often => { prob = 0.75; }
-            StratNope::Always => { prob = 1.0; }
+            Strategy::Nope(StratNope::Random) => { prob = 0.1; }
+            Strategy::Nope(StratNope::Never) => { prob = 0.0; }
+            Strategy::Nope(StratNope::Rarely) => { prob = 0.25; }
+            Strategy::Nope(StratNope::Sometimes) => { prob = 0.5; }
+            Strategy::Nope(StratNope::Often) => { prob = 0.75; }
+            Strategy::Nope(StratNope::Always) => { prob = 1.0; }
             _ => { }
         }
         return rng.gen::<f64>() <= prob;
@@ -27,37 +27,40 @@ impl Nope
     {
         if !hands[num].contains(&Card::Nope) { return false; }
 
-        let will_nope:bool;
+        let mut will_nope:bool = false;
         let mut rng = rand::thread_rng();
-        match strat.nope
+        let nope_strat = *strat.get("nope").unwrap();
+
+        match nope_strat
         {
-            StratNope::Random => { will_nope = rng.gen::<f64>() <= 0.1; }
-            StratNope::Never => { will_nope = false; }
-            StratNope::Rarely => { will_nope = rng.gen::<f64>() <= 0.25; }
-            StratNope::Sometimes => { will_nope = rng.gen::<f64>() <= 0.5; }
-            StratNope::Often => { will_nope = rng.gen::<f64>() <= 0.75; }
-            StratNope::Always => { will_nope = true; }
-            StratNope::OnlyIfSafe => {
+            Strategy::Nope(StratNope::Random) => { will_nope = rng.gen::<f64>() <= 0.1; }
+            Strategy::Nope(StratNope::Never) => { will_nope = false; }
+            Strategy::Nope(StratNope::Rarely) => { will_nope = rng.gen::<f64>() <= 0.25; }
+            Strategy::Nope(StratNope::Sometimes) => { will_nope = rng.gen::<f64>() <= 0.5; }
+            Strategy::Nope(StratNope::Often) => { will_nope = rng.gen::<f64>() <= 0.75; }
+            Strategy::Nope(StratNope::Always) => { will_nope = true; }
+            Strategy::Nope(StratNope::OnlyIfSafe) => {
                 will_nope = hands[num].len() >= 5;
             }
-            StratNope::OnlyDefuseless => {
+            Strategy::Nope(StratNope::OnlyDefuseless) => {
                 will_nope = !hands[num].contains(&Card::Defuse);
             }
-            StratNope::Direct => {
+            Strategy::Nope(StratNope::Direct) => {
                 will_nope = direct_attack;
             }
-            StratNope::DirectUnsafe => {
+            Strategy::Nope(StratNope::DirectUnsafe) => {
                 will_nope = direct_attack && !hands[num].contains(&Card::Defuse);
             }
-            StratNope::Wait => {
+            Strategy::Nope(StratNope::Wait) => {
                 will_nope = hands.len() <= 2;
             }
-            StratNope::DeNope => { 
+            Strategy::Nope(StratNope::DeNope) => { 
                 will_nope = card == Card::Nope;
             }
-            StratNope::DeNopeDirect => {
+            Strategy::Nope(StratNope::DeNopeDirect) => {
                 will_nope = direct_attack && card == Card::Nope;
             }
+            _ => {}
         }
 
         return will_nope;
