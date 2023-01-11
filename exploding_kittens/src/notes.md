@@ -4,10 +4,7 @@ TO DO:
 * ATTACK: track hoeveel attacks er op elkaar zijn gespeeld in de state? (Eerste attack = repeating turns naar 1, daarna is het repeat_turns + num_attacks*2, wordt gereset zodra speler wisselt aan einde loop)
 * Meer speelstrategieën
 * Splits een aantal strategieën verder
-  * Splits combo in drie: kans op gebruiken/vragen, 2 of 3 voorkeur, katkaarten of alle kaarten voorkeur
   * Splits nope in vier: kans op gebruiken/vragen, eventuele override, verdedigend nopen (in welke situatie gebruik je een Nope als je direct wordt aangevallen?), multinope
-  * Omgaan met toekomst bekijken => Altijd, Alleen als geen Defuse, Alleen als kan veranderen, Bewust een Future kaart _vragen_ aan het begin van je beurt
-  * Omgaan met de beurt _nadat_ iemand een Kitten heeft terug gestopt => Sowieso omzeilen, alleen omzeilen als weinig spelers over, alleen omzeilen als geen Defuse meer, soms omzeilen, niks om geven
 * Bij kiezen welke kaart je vraagt van iemand, ook wat andere strategieën meenemen.
   * Dus als je die Attacks spaart, vraag dan ook naar Attacks
   * Als jouw Future strategie belangrijk is, vraag naar Future

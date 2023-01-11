@@ -3,44 +3,27 @@ use std::{fmt, collections::HashMap};
 use enum_iterator::Sequence;
 pub type Combo = (Card, usize);
 
-// The strategy a specific player is using
-/*
-#[derive(Copy, Clone, Debug)]
-pub struct Strat {
-    pub play: StratPlay,
-    pub nope: StratNope,
-    pub combo: StratCombo,
-    pub kitten: StratKitten,
-    pub victim: StratVictim
-}
+// NOTE: This is an enum that has subenums. 
+// It makes syntax a little more verbose / complicated throughout the simulation, so why use it?
+// 1) One type for all strategies. 
+// 2) This easily allows generic functions on it => such as the impl below that allows printing enums as strings
+// 3) And HashMaps, which are iterable => no duplicate code or fixed indexing
+// 4) Clarity => I know all strategies can always be found in the enum Strategy
 
-impl Strat
-{
-    pub fn new_random(options:&StratListStruct) -> Self
-    {
-        let mut rng = rand::thread_rng();
-        Strat {
-            play: *options.play.choose(&mut rng).unwrap(),
-            nope: *options.nope.choose(&mut rng).unwrap(),
-            combo: *options.combo.choose(&mut rng).unwrap(),
-            kitten: *options.kitten.choose(&mut rng).unwrap(),
-            victim: *options.victim.choose(&mut rng).unwrap()
-        }
-    }
-}
- */
+// Maybe, when I get more experience with Rust, I find better ways.
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Sequence)]
 pub enum Strategy {
     Play(StratPlay),
     Nope(StratNope),
     Combo(StratCombo),
+    ComboPref(StratComboPref),
+    ComboType(StratComboType),
     Kitten(StratKitten),
-    Victim(StratVictim)
+    Victim(StratVictim),
+    Answer(StratAnswer),
+    Future(StratFuture)
 }
-
-pub type Strat = HashMap<String, Strategy>;
-pub type StratList = HashMap<String, Vec<Strategy>>;
 
 impl fmt::Display for Strategy {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -48,6 +31,8 @@ impl fmt::Display for Strategy {
     }
 }
 
+pub type Strat = HashMap<String, Strategy>;
+pub type StratList = HashMap<String, Vec<Strategy>>;
 
 #[derive(Eq, PartialEq, Hash, Copy, Clone, Debug)]
 pub enum Card {
@@ -75,6 +60,7 @@ pub struct CardData {
     pub anti: bool
 }
 
+/* PLAY ( = picking cards to play) */
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Sequence)]
 pub enum StratPlay {
     Random,
@@ -85,6 +71,27 @@ pub enum StratPlay {
     NotIfSafe
 }
 
+// How you react to the player before you exploding (and putting a kitten back in the deck)
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Sequence)]
+pub enum StratAnswer {
+    Random,
+    Ignore,
+    FewPlayers,
+    Defuseless,
+    Always
+}
+
+// How you deal with future cards (asking and using)
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Sequence)]
+pub enum StratFuture {
+    Random,
+    Never,
+    Defuseless,
+    Changable,
+    Always
+}
+
+/* NOPE */
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Sequence)]
 pub enum StratNope {
     Random,
@@ -102,18 +109,35 @@ pub enum StratNope {
     DeNopeDirect
 }
 
+/* COMBOS */
+// The probability of asking and playing a combo
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Sequence)]
 pub enum StratCombo {
-    Random,
-    Never,
-    Rarely,
-    Sometimes,
-    Often,
-    Always,
-    ThreesSometimes,
-    ThreesAlways,
-    AllCards,
-    AllCardsThrees
+    Never = 0,
+    Rarely = 3,
+    Sometimes = 7,
+    Often = 11,
+    Always = 15
+}
+
+// Whether you prefer combos of 2 or 3
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Sequence)]
+pub enum StratComboPref {
+    Two = 0,
+    TwoMost = 3,
+    Split = 7,
+    ThreeMost = 11,
+    Three = 15
+}
+
+// Whether you use cat cards for combos or all cards
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Sequence)]
+pub enum StratComboType {
+    Cat = 0,
+    CatMost = 3,
+    Split = 7,
+    AllMost = 11,
+    All = 15
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Sequence)]

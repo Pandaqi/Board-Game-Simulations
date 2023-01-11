@@ -203,7 +203,7 @@ impl Game
 
                 for _i in 0..combo.1
                 {
-                    let idx = hands[num].iter().position(|c| *c == combo.0).unwrap();
+                    let idx = Helpers::get_index(combo.0, &hands[num]);
                     hands[num].remove(idx);
                 }
                 
@@ -226,6 +226,18 @@ impl Game
         {
             return Helpers::get_anti_kitten_cards(&hands[num]).len() > 0;
         }
+
+        // if the previous player exploded, check how much we care
+        if state.prev_exploded && state.cards_played <= 0 && Helpers::will_answer_previous_explosion(num, hands, strat)
+        {
+            return Helpers::get_anti_kitten_cards(&hands[num]).len() > 0;
+        }
+
+        // TO DO: Big issue here. This function can return FALSE, even if we actually wanted to play a COMBO.
+        // IDEA:
+        // In this function, toggle something on STATE that says "must play anti kitten card" (so we don't have to recheck below)
+        // If we don't have an anti kitten card ...
+        //  > Check for ways to steal cards (combo / favor), try those first, hoping for such an anti card
 
         let mut rng = rand::thread_rng();
         let mut keep_playing:bool = false;
@@ -267,7 +279,7 @@ impl Game
             let arr = Helpers::get_anti_kitten_cards(&playable_hand);
             if arr.len() > 0 
             {
-                let idx = playable_hand.iter().position(|c| *c == arr[0]).unwrap();
+                let idx = Helpers::get_index(arr[0], &playable_hand);
                 cards_to_play.push((arr[0], 1));
                 playable_hand.remove(idx);
             }
@@ -288,6 +300,15 @@ impl Game
         // onwards, _exclude_ those cards from the playable hand 
         playable_hand = Combos::remove_combo_cards(&playable_hand);
         if playable_hand.len() <= 0 { return cards_to_play; }
+
+        if Helpers::will_play_future(&playable_hand, strat)
+        {
+            let future_card_idx = Helpers::get_index(Card::Future, &playable_hand);
+            cards_to_play.push((Card::Future, 1));
+            playable_hand.remove(future_card_idx);
+            return cards_to_play; // TO DO: do we actually want to return??
+        }
+
 
         // otherwise let our strategy decide
         // TO DO => this is incorrect right now, because it considers ALL strategies, not just the play ones right?
@@ -328,7 +349,7 @@ impl Game
                 if nope_active { direct_attack = idx == num; } // but we can un-nope ourself
                 
                 if Nope::opponent_will_nope(idx, card, hands, &strategies[idx], direct_attack) {
-                    let nope_card_idx = hands[idx].iter().position(|c| *c == Card::Nope).unwrap();
+                    let nope_card_idx = Helpers::get_index(Card::Nope, &hands[idx]);
                     hands[idx].remove(nope_card_idx);
                     num_nopes += 1;
                     break;
@@ -429,9 +450,9 @@ impl Game
             requested_card = Card::Nope;
         }
 
-        if need_to_request_card && Combos::request_based_on_strategy(combo_strat)
+        if need_to_request_card && Combos::request_based_on_strategy(strat)
         {
-            requested_card = Combos::pick_card_to_steal(&hands[num], combo_strat);
+            requested_card = Combos::pick_card_to_steal(&hands[num], strat);
         }
 
         // TO DO: The PickOne and PickDiverse strats aren't 100% correct, because indices of players CHANGE as players are killed ...
@@ -491,7 +512,7 @@ impl Game
         if need_to_request_card
         {
             if !hands[idx].contains(&requested_card) { return; }
-            steal_idx = hands[idx].iter().position(|c| *c == requested_card).unwrap();
+            steal_idx = Helpers::get_index(requested_card, &hands[idx]);
         }
 
         // finally, remove the card from our victim, add it to our hand
@@ -512,7 +533,7 @@ impl Game
 
         hands[num].pop(); // remove kitten from hand again, is certainly in last place
 
-        let defuse_card_idx = hands[num].iter().position(|c| *c == Card::Defuse).unwrap();
+        let defuse_card_idx = Helpers::get_index(Card::Defuse, &hands[num]);
         hands[num].remove(defuse_card_idx);
 
         return DrawResult::Defuse;

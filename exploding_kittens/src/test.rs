@@ -67,7 +67,7 @@ mod tests {
 
         // index manipulation
         let hand:Hand = vec![Card::Attack, Card::Nope, Card::Nope, Card::Skip, Card::Shuffle];
-        assert_eq!(Helpers::get_actual_index(Card::Nope, &hand), 1);
+        assert_eq!(Helpers::get_index(Card::Nope, &hand), 1);
 
         // general draw: should result in a NUMBER for the card index, but not modify the hand
         let hands:Vec<Hand> = vec![vec![Card::Attack]];

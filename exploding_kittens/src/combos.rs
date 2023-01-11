@@ -11,25 +11,46 @@ impl Combos
         return CARD_DATA[card].combo;
     }
 
-    pub fn use_any_card(strat:Strategy) -> bool
+    pub fn use_any_card(strat:&Strat) -> bool
     {
-        return strat == Strategy::Combo(StratCombo::AllCards) 
-            || strat == Strategy::Combo(StratCombo::AllCardsThrees);
+        let type_strat = *strat.get("combo_type").unwrap();
+        if let Strategy::ComboType(tp) = type_strat
+        {
+            let prob = ((tp as usize) as f64) / 15.0;
+            let mut rng = rand::thread_rng();
+            return rng.gen::<f64>() <= prob;
+        }
+        return false;
     }
 
-    pub fn wait_for_threes(strat:Strategy) -> bool
+    pub fn wait_for_threes(strat:&Strat) -> bool
     {
-        return strat == Strategy::Combo(StratCombo::ThreesSometimes) 
-            || strat == Strategy::Combo(StratCombo::ThreesAlways)
-            || strat == Strategy::Combo(StratCombo::AllCardsThrees);
+        let pref_strat = *strat.get("combo_pref").unwrap();
+        if let Strategy::ComboType(tp) = pref_strat
+        {
+            let prob = ((tp as usize) as f64) / 15.0;
+            let mut rng = rand::thread_rng();
+            return rng.gen::<f64>() <= prob;
+        }
+        return false;
+    }
+
+    pub fn request_based_on_strategy(strat:&Strat) -> bool
+    {
+        let combo_strat = *strat.get("combo_pref").unwrap();
+        if let Strategy::ComboType(tp) = combo_strat
+        {
+            let prob = ((tp as usize) as f64) / 15.0;
+            let mut rng = rand::thread_rng();
+            return rng.gen::<f64>() <= prob;
+        }
+        return false;
     }
 
     pub fn get_combo(cards:&Hand, strat:&Strat) -> Option<Combo>
     {
-        let combo_strat = *strat.get("combo").unwrap();
-        let match_value = if Combos::wait_for_threes(combo_strat) { 3 } else { 2 };
-
-        let only_use_cat_cards = !Combos::use_any_card(combo_strat);
+        let match_value = if Combos::wait_for_threes(strat) { 3 } else { 2 };
+        let only_use_cat_cards = !Combos::use_any_card(strat);
 
         let freqs = Helpers::create_frequency_map(cards);
         let mut choice:Option<Combo> = None;
@@ -47,7 +68,7 @@ impl Combos
         return choice;
     }
 
-    pub fn pick_card_to_steal(hand:&Hand, strat:Strategy) -> Card
+    pub fn pick_card_to_steal(hand:&Hand, strat:&Strat) -> Card
     {
         let only_use_cat_cards = !Combos::use_any_card(strat);
         let freqs = Helpers::create_frequency_map(hand);
@@ -67,33 +88,14 @@ impl Combos
 
     pub fn want_to_play_combo(combo:Combo, strat:&Strat) -> bool
     {
-        let combo_strat = *strat.get("combo").unwrap();
-        let wait_for_threes = Combos::wait_for_threes(combo_strat);
+        let wait_for_threes = Combos::wait_for_threes(strat);
         if wait_for_threes && combo.1 != 3 { return false; }
 
         // TO DO: does it matter WHAT cards you're using for the combo? (Only cat cards, never special cards, etc.)
 
-        return Combos::request_based_on_strategy(combo_strat);
+        return Combos::request_based_on_strategy(strat);
     }
-
-    pub fn request_based_on_strategy(strat:Strategy) -> bool
-    {
-        let mut prob:f64 = 0.0;
-        let mut rng = rand::thread_rng();
-        match strat
-        {
-            Strategy::Combo(StratCombo::Random) => { prob = 0.33; }
-            Strategy::Combo(StratCombo::Never) => { prob = 0.0; }
-            Strategy::Combo(StratCombo::Rarely) => { prob = 0.25; }
-            Strategy::Combo(StratCombo::Sometimes) | Strategy::Combo(StratCombo::ThreesSometimes) => { prob = 0.5; }
-            Strategy::Combo(StratCombo::Often) => { prob = 0.75; }
-            Strategy::Combo(StratCombo::Always) | Strategy::Combo(StratCombo::ThreesAlways) => { prob = 1.0; }
-            Strategy::Combo(StratCombo::AllCards) | Strategy::Combo(StratCombo::AllCardsThrees) => { prob = 0.33; }
-            _ => {}
-        }
-        return rng.gen::<f64>() <= prob;
-    }
-
+    
     pub fn remove_combo_cards(cards:&Hand) -> Hand
     {
         let mut arr:Hand = Vec::new();

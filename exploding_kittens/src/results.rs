@@ -26,8 +26,8 @@ impl Results
 
         for(k,v) in res.options.iter()
         {
-            let strats = Helpers::to_string_list(res.strats.get(k).unwrap());
-            let options = Helpers::to_string_list(v);
+            let strats = Helpers::extract_inside_parentheses(Helpers::to_string_list(res.strats.get(k).unwrap()));
+            let options = Helpers::extract_inside_parentheses(Helpers::to_string_list(v));
             Results::to_histogram(cfg, &k, strats, options);
         }
     }
@@ -38,8 +38,6 @@ impl Results
         let upper_bound = 2*( (cfg.num_iterations as f64) / (x_values.len() as f64) ).ceil() as i32;
         let y_values:Range<i32> = 0..upper_bound;
 
-        let x_values_better = Helpers::extract_inside_parentheses(x_values);
-    
         let file_path = "images/".to_owned() + &cfg.file_prefix.to_owned() + "_" + file_key + ".png";
         let root_area = BitMapBackend::new(&file_path, (900, 600)).into_drawing_area();
         root_area.fill(&WHITE).unwrap();
@@ -51,11 +49,11 @@ impl Results
             .set_label_area_size(LabelAreaPosition::Left, 40)
             .set_label_area_size(LabelAreaPosition::Bottom, 40)
             .caption(graph_title, ("serif", 40))
-            .build_cartesian_2d(x_values_better.into_segmented(), y_values)
+            .build_cartesian_2d(x_values.into_segmented(), y_values)
             .unwrap();
     
         ctx.configure_mesh()
-            .x_labels(x_values_better.len()+1)
+            .x_labels(x_values.len()+1)
             .draw()
             .unwrap();
     

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use rand::{Rng, seq::{SliceRandom, IteratorRandom}};
 
-use crate::{strats::{CardData, Card, Hand, Strat, StratList, Strategy}};
+use crate::{strats::{CardData, Card, Hand, Strat, StratList, Strategy, StratAnswer, StratFuture}};
 
 lazy_static! {
     pub static ref CARD_DATA:HashMap<Card, CardData> = HashMap::from([
@@ -111,12 +111,56 @@ impl Helpers
         return next_player == other_num && Helpers::card_is_agressive(card);
     }
 
+    pub fn will_play_future(my_hand:&Hand, strat:&Strat) -> bool
+    {
+        if !my_hand.contains(&Card::Future) { return false; }
+
+        let future_strat = *strat.get("future").unwrap();
+        let mut rng = rand::thread_rng();
+        let mut response:bool = false;
+        match future_strat
+        {
+            Strategy::Future(StratFuture::Random) => { response = rng.gen::<f64>() <= 0.5; }
+            Strategy::Future(StratFuture::Never) => { response = false; }
+            Strategy::Future(StratFuture::Changable) => {
+                response = Helpers::get_anti_kitten_cards(my_hand).len() > 0;
+            }
+            Strategy::Future(StratFuture::Defuseless) => {
+                response = !my_hand.contains(&Card::Defuse);
+            }
+            Strategy::Future(StratFuture::Always) => { response = true; }
+            _ => {}
+        }
+        return response;
+    }
+
+    pub fn will_answer_previous_explosion(num:usize, hands:&Vec<Hand>, strat:&Strat) -> bool
+    {
+        let answer_strat = *strat.get("answer").unwrap();
+        let mut rng = rand::thread_rng();
+        let mut response:bool = false;
+        match answer_strat
+        {
+            Strategy::Answer(StratAnswer::Random) => { response = rng.gen::<f64>() <= 0.5; }
+            Strategy::Answer(StratAnswer::Ignore) => { response = false; }
+            Strategy::Answer(StratAnswer::Defuseless) => {
+                response = !hands[num].contains(&Card::Defuse);
+            }
+            Strategy::Answer(StratAnswer::FewPlayers) => {
+                response = hands.len() <= 3;
+            }
+            Strategy::Answer(StratAnswer::Always) => { response = true; }
+            _ => {}
+        }
+        return response;
+    }
+
     pub fn sort_descending(arr:&mut Vec<usize>)
     {
         arr.sort_by(|a, b| b.cmp(a));
     }
 
-    pub fn get_actual_index(value:Card, arr:&Hand) -> usize
+    pub fn get_index(value:Card, arr:&Hand) -> usize
     {
         return arr.iter().position(|c| *c == value).unwrap();
     }

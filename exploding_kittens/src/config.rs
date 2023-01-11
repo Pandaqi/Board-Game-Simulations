@@ -41,7 +41,7 @@ impl SimConfig
     {
         Self {
             file_prefix: "enum_rewrite".to_string(),
-            num_iterations: 1,
+            num_iterations: 100,
             print_interval: 1000,
             player_count: 4,
             randomize_player_count: true,
