@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use rand::{Rng, seq::{SliceRandom, IteratorRandom}};
 
-use crate::{strats::{CardData, Card, Hand, Strat, StratList, Strategy, StratAnswer, StratFuture}};
+use crate::{strats::{CardData, Card, Hand, Strat, StratList, Strategy, StratAnswer, StratFuture}, combos::Combos};
 
 lazy_static! {
     pub static ref CARD_DATA:HashMap<Card, CardData> = HashMap::from([
@@ -12,7 +12,7 @@ lazy_static! {
         (Card::Nope, CardData { freq: 5, combo: false, play: false, anti: false }),
         (Card::Attack, CardData { freq: 4, combo: false, play: true, anti: true }),
         (Card::Skip, CardData { freq: 4, combo: false, play: true, anti: true  }),
-        (Card::Favor, CardData { freq: 4, combo: false, play: true, anti: true }),
+        (Card::Favor, CardData { freq: 4, combo: false, play: true, anti: false }),
         (Card::Shuffle, CardData { freq: 4, combo: false, play: true, anti: true }),
         (Card::Future, CardData { freq: 5, combo: false, play: true, anti: false }),
         (Card::Cattermelon, CardData { freq: 4, combo: true, play: true, anti: false }),
@@ -113,8 +113,6 @@ impl Helpers
 
     pub fn will_play_future(my_hand:&Hand, strat:&Strat) -> bool
     {
-        if !my_hand.contains(&Card::Future) { return false; }
-
         let future_strat = *strat.get("future").unwrap();
         let mut rng = rand::thread_rng();
         let mut response:bool = false;
@@ -188,6 +186,45 @@ impl Helpers
     {
         let mut rng = rand::thread_rng();
         return rng.gen_range(0..player_count);
+    }
+
+    pub fn get_random_anti_card() -> Card
+    {
+        let mut rng = rand::thread_rng();
+        let mut arr:Vec<Card> = Vec::new();
+        for (k,v) in CARD_DATA.iter()
+        {
+            if v.anti { arr.push(*k); }
+        }
+        return *arr.choose(&mut rng).unwrap();
+    }
+
+    pub fn can_make_future_play(cards:&Hand, strat:&Strat) -> bool
+    {
+        let has_future_card = cards.contains(&Card::Future);
+        let has_stealing_cards = Helpers::has_stealing_cards(cards, strat);
+        return has_future_card || has_stealing_cards;
+    }
+
+    pub fn can_make_anti_play(cards:&Hand, strat:&Strat) -> bool
+    {
+        let has_anti_cards = Helpers::has_anti_kitten_cards(cards);
+        let has_stealing_cards = Helpers::has_stealing_cards(cards, strat);
+        return has_anti_cards || has_stealing_cards;
+    }
+
+    pub fn has_stealing_cards(cards:&Hand, strat:&Strat) -> bool
+    {
+        return Combos::get_combo(cards, strat).is_some() || cards.contains(&Card::Favor);
+    }
+
+    pub fn has_anti_kitten_cards(cards:&Hand) -> bool
+    {
+        for v in cards.iter()
+        {
+            if CARD_DATA[v].anti { return true; }
+        }
+        return false;
     }
 
     pub fn get_anti_kitten_cards(cards:&Hand) -> Vec<Card>

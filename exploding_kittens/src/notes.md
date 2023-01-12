@@ -1,17 +1,19 @@
 TO DO:
 * TESTS voor de COMBO functies
-* NOPE: zie iets altijd als een directe aanval als je met twee spelers bent, of jij de enige andere speler met kaarten?
+* Maak de default dat je alleen Future speelt als je het kan veranderen => maar dat zou de volgorde weer moeilijk maken, want dan wil je _eerst_ rondvragen en een anti-kitten kaart spelen
+  * Sowieso slimmere Future strategieën. Heb nu het idee dat spelers te veel kaarten eraan gaan opbranden omdat ze mijn regels willen volgen tot het UITERSTE
+  * Dat moet sowieso opgelost. Ik denk dat de andere Play strategieën hierin leidend zijn: wat is jouw maximum aan kaarten voordat je "opgeeft" voor deze beurt?
+  * De Play strategie moet denk ik LEIDEND zijn. (Dus als Play strategie zegt: nooit kaarten spelen, dan overschrijft dat de Future en Anti dingen.) 
+* NOPE:
+  * Betere definitie "direct attack" toepassen + strategie/voorkeur om combo's te nopen (meer waarde voor je nope)
+  * Toestaan dat je kaarten stelen nopet 
+  * Splits in vier: kans op gebruiken/vragen, eventuele override, verdedigend nopen (in welke situatie gebruik je een Nope als je direct wordt aangevallen?), multinope
 * ATTACK: track hoeveel attacks er op elkaar zijn gespeeld in de state? (Eerste attack = repeating turns naar 1, daarna is het repeat_turns + num_attacks*2, wordt gereset zodra speler wisselt aan einde loop)
 * Meer speelstrategieën
-* Splits een aantal strategieën verder
-  * Splits nope in vier: kans op gebruiken/vragen, eventuele override, verdedigend nopen (in welke situatie gebruik je een Nope als je direct wordt aangevallen?), multinope
-* Bij kiezen welke kaart je vraagt van iemand, ook wat andere strategieën meenemen.
-  * Dus als je die Attacks spaart, vraag dan ook naar Attacks
-  * Als jouw Future strategie belangrijk is, vraag naar Future
-  * Nieuwe strategie kaart vragen: alleen kitten-omzeil kaarten (maak Defuse de standaard?)
-  * (Ik doe dit al voor Nope en Combo.)
+* GEBRUIK de andere soorten plots (van spelverloop) om te testen of de simulatie wel fatsoenlijk werkt
 * Algemeen
   * Breng de "fixed strategy player 0" code terug
+  * Bijhouden welke _beginkaarten_ de winnende speler had, misschien is dat interessante data?
   * Gebruik de debugger op iets meer plekken
   * Kan ik nog andere getalletjes bijhouden die interessant zijn? Zoals "kans dat je wint als jij een tweede defuse kaart weet te trekken" of "kans dat je wint afhankelijk van met hoeveel Nope kaarten je begint"
   * Vind een manier om het verloop van een potje in een grafiek of tabel te zetten? (Is mooi én goede check)

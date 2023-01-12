@@ -155,6 +155,7 @@ pub enum StratVictim {
     Random,
     Defuse,
     DefuseProb,
+    Anti,
     MostCards,
     LeastCards,
     SeatBefore,

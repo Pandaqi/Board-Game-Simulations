@@ -33,14 +33,23 @@ pub enum DrawResult {
 }
 
 pub struct GameState {
-    pub repeat_turns: usize,
     pub skip_draw: bool,
+    pub cards_played: usize,
+
+    pub anti_play: bool,
+    pub played_anti: bool,
+
+    pub future_play: bool,
     pub saw_future: bool,
     pub will_draw_kitten: bool,
-    pub cards_played: usize,
+
+    pub steal_card: bool,
+    pub wanted_card: Card,
+
+    pub repeat_turns: usize,
     pub prev_exploded: bool,
     pub exploded: Vec<bool>,
-    pub prev_victim: Vec<usize>
+    pub prev_victim: Vec<usize>,
 }
 
 impl GameState
@@ -50,9 +59,14 @@ impl GameState
         Self {
             repeat_turns: 0,
             skip_draw: false,
+            anti_play: false,
+            played_anti: false,
+            future_play: false,
             saw_future: false,
             will_draw_kitten: false,
             cards_played: 0,
+            steal_card: false,
+            wanted_card: Card::Defuse,
             prev_exploded: false,
             exploded: Vec::new(),
             prev_victim: Vec::new()
@@ -66,11 +80,17 @@ impl GameState
     }
     
     // resets everything that is NOT kept between turns
-    // (those are: repeat_turns, prev_exploded)
+    // (those are: repeat_turns, exploded, prev_exploded, prev_victim)
+    // TO DO: better syntax for this, instead of copy-pasting code
     pub fn reset(&mut self)
     {
         self.skip_draw = false;
+        self.anti_play = false;
+        self.played_anti = false;
+        self.future_play = false;
         self.saw_future = false;
+        self.steal_card = false;
+        self.wanted_card = Card::Defuse;
         self.will_draw_kitten = false;
         self.cards_played = 0;
     }
@@ -215,30 +235,51 @@ impl Game
         }
     }
 
-    pub fn wants_to_continue_turn(num:usize, hands:&Vec<Hand>, strat:&Strat, state:&GameState) -> bool
+    pub fn wants_to_continue_turn(num:usize, hands:&Vec<Hand>, strat:&Strat, state:&mut GameState) -> bool
     {
         // determine if we want to keep playing cards (can't if we don't HAVE any cards)
         if Helpers::count_playable_cards(&hands[num]) <= 0 { return false; }
 
-        // a general rule that every player will live by, regardless of strategy
+        /* Anti-Kitten play */
+        // only on turn start (first check)
+        // if the previous player exploded, check how much we care
+        if state.prev_exploded && state.cards_played <= 0 
+        {
+            if Helpers::will_answer_previous_explosion(num, hands, strat)
+            {
+                state.anti_play = true;
+            }
+        }
+
         // if we know we will draw a kitten, and we have a card to stop it, DO THAT
         if state.saw_future && state.will_draw_kitten
         {
-            return Helpers::get_anti_kitten_cards(&hands[num]).len() > 0;
+            state.anti_play = true;
         }
 
-        // if the previous player exploded, check how much we care
-        if state.prev_exploded && state.cards_played <= 0 && Helpers::will_answer_previous_explosion(num, hands, strat)
+        // if we already played anti, ignore all this
+        if state.played_anti { state.anti_play = false; }
+
+        // we want to make an anti play, but don't have the cards? don't keep playing
+        if state.anti_play && !Helpers::can_make_anti_play(&hands[num], strat)
         {
-            return Helpers::get_anti_kitten_cards(&hands[num]).len() > 0;
+            return false;
         }
 
-        // TO DO: Big issue here. This function can return FALSE, even if we actually wanted to play a COMBO.
-        // IDEA:
-        // In this function, toggle something on STATE that says "must play anti kitten card" (so we don't have to recheck below)
-        // If we don't have an anti kitten card ...
-        //  > Check for ways to steal cards (combo / favor), try those first, hoping for such an anti card
+        /* Future */
+        state.future_play = false;
+        if !state.saw_future && Helpers::can_make_future_play(&hands[num], strat)
+        {
+            if Helpers::will_play_future(&hands[num], strat)
+            {
+                state.future_play = true;
+            }
+        }
 
+        // If we want to make one of these plays, we have to continue playing cards (duh)
+        if state.anti_play || state.future_play { return true; }
+
+        /* General strategy */
         let mut rng = rand::thread_rng();
         let mut keep_playing:bool = false;
         let play_strat = *strat.get("play").unwrap();
@@ -264,7 +305,7 @@ impl Game
         return keep_playing;
     }
 
-    pub fn pick_card_to_play(num:usize, hands:&Vec<Hand>, strat:&Strat, state:&GameState) -> Vec<Combo>
+    pub fn pick_card_to_play(num:usize, hands:&Vec<Hand>, strat:&Strat, state:&mut GameState) -> Vec<Combo>
     {
         // determine what we want to play
         let mut cards_to_play:Vec<Combo> = Vec::new();
@@ -273,25 +314,67 @@ impl Game
 
         if playable_hand.len() <= 0 { return Vec::new(); }
 
-        // the general rule: we know the future is bad, so prevent it
-        if state.saw_future && state.will_draw_kitten
+        /* Future */
+        if state.future_play 
+        { 
+            if playable_hand.contains(&Card::Future) 
+            {
+                let future_card_idx = Helpers::get_index(Card::Future, &playable_hand);
+                cards_to_play.push((Card::Future, 1));
+                playable_hand.remove(future_card_idx);
+                return cards_to_play;
+            } else {
+                state.steal_card = true;
+                state.wanted_card = Card::Future;
+            }
+        }
+
+        /* Anti-Kitten */
+        if state.anti_play
         {
             let arr = Helpers::get_anti_kitten_cards(&playable_hand);
-            if arr.len() > 0 
+            let has_anti_card = arr.len() > 0;
+        
+            if has_anti_card
             {
-                let idx = Helpers::get_index(arr[0], &playable_hand);
-                cards_to_play.push((arr[0], 1));
-                playable_hand.remove(idx);
+                let anti_card = arr[0];
+                let anti_card_idx = Helpers::get_index(anti_card, &playable_hand);
+                cards_to_play.push((anti_card, 1));
+                playable_hand.remove(anti_card_idx);
+                return cards_to_play;
+            } else {
+                state.steal_card = true;
+                state.wanted_card = Helpers::get_random_anti_card();
+            }
+        }
+
+        /* Card getting */
+        // if we want to steal a card, first try a favor (cheaper than a combo)
+        // (we return here, as there's no point doing anything else until we have this result)
+        if state.steal_card
+        {
+            if playable_hand.contains(&Card::Favor)
+            {
+                let favor_card_idx = Helpers::get_index(Card::Favor, &playable_hand);
+                cards_to_play.push((Card::Favor, 1));
+                playable_hand.remove(favor_card_idx); 
+                return cards_to_play;       
             }
         }
 
         if playable_hand.len() <= 0 { return cards_to_play; }
 
-        // COMBO CHECKER
+        /* Combos */
         let mut play_combo:bool = false;
         let combo:Option<Combo> = Combos::get_combo(&playable_hand, strat);
-        if combo.is_some() { play_combo = Combos::want_to_play_combo(combo.unwrap(), strat); }
-        if play_combo { 
+
+        if combo.is_some() 
+        { 
+            play_combo = Combos::want_to_play_combo(combo.unwrap(), strat) || state.steal_card; 
+        }
+
+        if play_combo 
+        { 
             cards_to_play.push(combo.unwrap()); 
             return cards_to_play;
         }
@@ -300,15 +383,6 @@ impl Game
         // onwards, _exclude_ those cards from the playable hand 
         playable_hand = Combos::remove_combo_cards(&playable_hand);
         if playable_hand.len() <= 0 { return cards_to_play; }
-
-        if Helpers::will_play_future(&playable_hand, strat)
-        {
-            let future_card_idx = Helpers::get_index(Card::Future, &playable_hand);
-            cards_to_play.push((Card::Future, 1));
-            playable_hand.remove(future_card_idx);
-            return cards_to_play; // TO DO: do we actually want to return??
-        }
-
 
         // otherwise let our strategy decide
         // TO DO => this is incorrect right now, because it considers ALL strategies, not just the play ones right?
@@ -378,38 +452,47 @@ impl Game
         if combo.1 == 2
         {
             Game::steal_card(num, hands, &strat, state, false);
+            return true;
         }
 
         if combo.1 == 3
         {
             Game::steal_card(num, hands, &strat, state, true);
+            return true;
         }
 
         // otherwise check the card on its own
         match combo.0
         {
-            Card::Skip => { state.skip_draw = true; }
+            Card::Skip => { 
+                state.skip_draw = true; 
+                state.played_anti = true;
+            }
             Card::Shuffle => { 
                 deck.shuffle(&mut rng); 
                 state.saw_future = false;
                 state.will_draw_kitten = false;
+                state.played_anti = true;
             }
             Card::Favor => {
                 Game::steal_card(num, hands, &strat, state, false);
             }
             Card::Attack => { 
                 state.skip_draw = true;
+                state.played_anti = true;
                 if state.repeat_turns == 0 { state.repeat_turns = 1; }
                 else { state.repeat_turns += 2; }
             }
             Card::Future => {
+                state.saw_future = true;
+                state.future_play = false;
+
                 let start = (deck.len() as i32 - 3).max(0) as usize;
                 let end = deck.len();
                 let range = start..end;
                 if !range.is_empty()
                 {
                     let last_three = deck.as_slice()[range].to_vec();
-                    state.saw_future = true;
                     state.will_draw_kitten = last_three.contains(&Card::Kitten);
                 }
             }
@@ -442,17 +525,25 @@ impl Game
         let mut idx: usize = *other_players.choose(&mut rng).unwrap();
         let mut requested_card:Card = Helpers::get_random_card();
 
-        let nope_strat = *strat.get("nope").unwrap();
-        let combo_strat = *strat.get("combo").unwrap();
-
-        if need_to_request_card && Nope::request_based_on_strategy(nope_strat)
+        if need_to_request_card
         {
-            requested_card = Card::Nope;
-        }
+            if Combos::request_based_on_strategy(strat)
+            {
+                requested_card = Combos::pick_card_to_steal(&hands[num], strat);
+            }
 
-        if need_to_request_card && Combos::request_based_on_strategy(strat)
-        {
-            requested_card = Combos::pick_card_to_steal(&hands[num], strat);
+            if Helpers::will_play_future(&hands[num], strat)
+            {
+                requested_card = Card::Future;
+            }
+
+            // TO DO: there are a few play strategies that focus on anti-kitten cards
+            // Identify those here, then request a random anti-card
+    
+            if state.steal_card
+            {
+                requested_card = state.wanted_card;
+            }
         }
 
         // TO DO: The PickOne and PickDiverse strats aren't 100% correct, because indices of players CHANGE as players are killed ...
@@ -471,6 +562,11 @@ impl Game
                     break;
                 }
             }
+
+            Strategy::Victim(StratVictim::Anti) => {
+                requested_card = Helpers::get_random_anti_card();
+            }
+
             Strategy::Victim(StratVictim::MostCards) => { idx = Helpers::get_player_with_most_cards(other_players, &hands); }
             Strategy::Victim(StratVictim::LeastCards) => { idx = Helpers::get_player_with_least_cards(other_players, &hands); }
             
@@ -491,6 +587,7 @@ impl Game
                 idx = new_victim;
                 state.prev_victim[num] = new_victim;
             }
+
             Strategy::Victim(StratVictim::PickDiverse) => {
                 let prev_victim = state.prev_victim[num];
                 if !other_players.contains(&prev_victim) || idx == prev_victim 
@@ -506,6 +603,8 @@ impl Game
             }
             _ => {}
         }
+
+        // TO DO: Ability to NOPE this shit
 
         // get index of requested card, or do nothing if the other player doesn't have it
         let mut steal_idx = rng.gen_range(0..hands[idx].len());

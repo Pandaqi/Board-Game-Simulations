@@ -53,8 +53,8 @@ mod tests {
         let hands:Vec<Hand> = vec![vec![]];
         let options = Simulator::setup().options;
         let strat = Helpers::generate_random_strategy(&options);
-        let state = GameState::new();
-        assert_eq!(Game::wants_to_continue_turn(0, &hands, &strat, &state), false);
+        let mut state = GameState::new();
+        assert_eq!(Game::wants_to_continue_turn(0, &hands, &strat, &mut state), false);
     }
 
     #[test]
@@ -72,10 +72,10 @@ mod tests {
         // general draw: should result in a NUMBER for the card index, but not modify the hand
         let hands:Vec<Hand> = vec![vec![Card::Attack]];
         let options = Simulator::setup().options;
-        let state = GameState::new();
+        let mut state = GameState::new();
         let mut strat = Helpers::generate_random_strategy(&options);
         strat.insert("play".to_owned(), Strategy::Play(StratPlay::Random));
-        assert_eq!(Game::pick_card_to_play(0, &hands, &strat, &state), vec![(Card::Attack, 1)]);
+        assert_eq!(Game::pick_card_to_play(0, &hands, &strat, &mut state), vec![(Card::Attack, 1)]);
         assert_eq!(hands[0].len(), 1);
 
         
