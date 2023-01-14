@@ -40,9 +40,9 @@ impl SimConfig
     pub fn new() -> Self
     {
         Self {
-            file_prefix: "new_game_loop".to_string(),
-            num_iterations: 50000,
-            print_interval: 1000,
+            file_prefix: "final".to_string(),
+            num_iterations: 100000,
+            print_interval: 5000,
             player_count: 4,
             randomize_player_count: true,
             create_images: true,

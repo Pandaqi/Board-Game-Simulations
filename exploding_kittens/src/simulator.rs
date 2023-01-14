@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use enum_iterator::all;
 
-use crate::{config::{SimConfig}, game::Game, results::SimResults, strats::{StratCombo, StratNope, StratPlay, Strat, StratKitten, StratVictim, StratList, Strategy, StratComboPref, StratComboType, StratAnswer, StratFuture}, helpers::Helpers};
+use crate::{config::{SimConfig}, game::Game, results::SimResults, strats::{StratCombo, StratNope, StratPlay, Strat, StratKitten, StratVictim, StratList, Strategy, StratComboPref, StratComboType, StratAnswer, StratFuture, StratNopeDefend, StratNopeCustom}, helpers::Helpers};
 
 pub struct Simulator {}
 
@@ -21,6 +21,8 @@ impl Simulator
             ("future".to_owned(), Helpers::create_enum_match_list(&fields_auto, Strategy::Future(StratFuture::Always))),            
             
             ("nope".to_owned(), Helpers::create_enum_match_list(&fields_auto, Strategy::Nope(StratNope::Always))),
+            ("nope_defend".to_owned(), Helpers::create_enum_match_list(&fields_auto, Strategy::NopeDefend(StratNopeDefend::Always))),
+            ("nope_custom".to_owned(), Helpers::create_enum_match_list(&fields_auto, Strategy::NopeCustom(StratNopeCustom::Pass))),
             
             ("combo".to_owned(), Helpers::create_enum_match_list(&fields_auto, Strategy::Combo(StratCombo::Never))),
             ("combo_pref".to_owned(), Helpers::create_enum_match_list(&fields_auto, Strategy::ComboPref(StratComboPref::Split))),

@@ -16,6 +16,8 @@ pub type Combo = (Card, usize);
 pub enum Strategy {
     Play(StratPlay),
     Nope(StratNope),
+    NopeCustom(StratNopeCustom),
+    NopeDefend(StratNopeDefend),
     Combo(StratCombo),
     ComboPref(StratComboPref),
     ComboType(StratComboType),
@@ -66,9 +68,14 @@ pub enum StratPlay {
     Random,
     Never,
     One,
+    Two,
+    Three,
+    AsNeeded,
     All,
     OnlyAfterKitten,
-    NotIfSafe
+    NotIfSafe,
+    AggroStart,
+    AggroLater,
 }
 
 // How you react to the player before you exploding (and putting a kitten back in the deck)
@@ -94,19 +101,30 @@ pub enum StratFuture {
 /* NOPE */
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Sequence)]
 pub enum StratNope {
-    Random,
-    Never,
-    Rarely,
-    Sometimes,
-    Often,
-    Always,
-    OnlyIfSafe,
-    OnlyDefuseless,
-    Direct,
+    Never = 0,
+    Rarely = 3,
+    Sometimes = 7,
+    Often = 11,
+    Always = 15
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Sequence)]
+pub enum StratNopeCustom {
+    Pass,
+    IfSafe,
+    IfUnsafe,
+    DirectSafe,
     DirectUnsafe,
     Wait,
-    DeNope,
-    DeNopeDirect
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Sequence)]
+pub enum StratNopeDefend {
+    Never = 0,
+    Rarely = 3,
+    Sometimes = 7,
+    Often = 11,
+    Always = 15
 }
 
 /* COMBOS */

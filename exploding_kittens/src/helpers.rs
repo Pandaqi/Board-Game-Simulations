@@ -38,6 +38,11 @@ impl Helpers
         return arr;
     }
 
+    pub fn count_total_cards(cards:&Vec<Hand>) -> usize
+    {
+        return cards.iter().map(Vec::len).sum();
+    }
+
     pub fn generate_deck() -> Vec<Card>
     {
         // generate full deck

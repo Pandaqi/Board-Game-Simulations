@@ -2,7 +2,7 @@
 mod tests {
     use enum_iterator::all;
 
-    use crate::{game::{Game, DrawResult, GameState, Debugger}, helpers::Helpers, strats::{StratPlay, StratKitten, Card, Strat, Hand, StratNope, Strategy, StratVictim}, simulator::Simulator, nope::Nope};
+    use crate::{game::{Game, DrawResult, GameState, Debugger}, helpers::Helpers, strats::{StratPlay, StratKitten, Card, Strat, Hand, StratNope, Strategy, StratVictim, Combo}, simulator::Simulator, nope::Nope};
 
     #[test]
     fn test_rust_functionality()
@@ -144,16 +144,19 @@ mod tests {
         let mut hands:Vec<Hand> = vec![vec![], vec![]];
         let options = Simulator::setup().options;
         let strat = Helpers::generate_random_strategy(&options);
+        let strats = Game::generate_random_strategies(count, &options);
         let mut state = GameState::new();
         state.init(count);
 
+        let combo:Combo = (Card::Favor, 1);
+
         // should do nothing (and not crash) if nobody to steal from
-        Game::steal_card(0, &mut hands, &strat, &mut state, false);
+        Game::steal_card(0, &mut hands, combo, &strat, &mut state, false, &strats);
         assert_eq!(hands[0].len(), 0);
 
         // regular steal
         hands = vec![vec![], vec![Card::Nope]];
-        Game::steal_card(0, &mut hands, &strat, &mut state, false);
+        Game::steal_card(0, &mut hands, combo, &strat, &mut state, false, &strats);
         assert_eq!(hands[0], vec![Card::Nope]);
 
         // TO DO: test specific strategies / combo stealing
@@ -244,15 +247,16 @@ mod tests {
         // insta-nope by other player
         hands = vec![vec![Card::Attack], vec![Card::Nope]];
         let mut strats = vec![strat.clone(), strat.clone()];
-        let nope_result:bool = Game::was_noped(num, &mut hands, (Card::Attack, 1), &strats);
+        let combo:Combo = (Card::Attack, 1);
+        let nope_result:bool = Game::was_noped(num, &mut hands, combo, &strats, None);
         assert_eq!(hands[1].len(), 0);
         assert_eq!(nope_result, true);
 
         // double nope
         // (both lose that card, but the end result is false = no noping)
         hands = vec![vec![Card::Attack, Card::Nope], vec![Card::Nope]];
-        strats[0].insert("nope".to_owned(), Strategy::Nope(StratNope::DeNopeDirect));
-        let nope_result:bool = Game::was_noped(num, &mut hands, (Card::Attack, 1), &strats);
+        strats[0].insert("nope".to_owned(), Strategy::Nope(StratNope::Always));
+        let nope_result:bool = Game::was_noped(num, &mut hands, combo, &strats, None);
         assert_eq!(nope_result, false);
         assert_eq!(hands[0].len(), 1);
         assert_eq!(hands[1].len(), 0);

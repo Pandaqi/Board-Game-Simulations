@@ -1,15 +1,8 @@
 TO DO:
 * TESTS voor de COMBO functies
-* Maak de default dat je alleen Future speelt als je het kan veranderen => maar dat zou de volgorde weer moeilijk maken, want dan wil je _eerst_ rondvragen en een anti-kitten kaart spelen
-  * Sowieso slimmere Future strategieën. Heb nu het idee dat spelers te veel kaarten eraan gaan opbranden omdat ze mijn regels willen volgen tot het UITERSTE
-  * Dat moet sowieso opgelost. Ik denk dat de andere Play strategieën hierin leidend zijn: wat is jouw maximum aan kaarten voordat je "opgeeft" voor deze beurt?
-  * De Play strategie moet denk ik LEIDEND zijn. (Dus als Play strategie zegt: nooit kaarten spelen, dan overschrijft dat de Future en Anti dingen.) 
-* NOPE:
-  * Betere definitie "direct attack" toepassen + strategie/voorkeur om combo's te nopen (meer waarde voor je nope)
-  * Toestaan dat je kaarten stelen nopet 
-  * Splits in vier: kans op gebruiken/vragen, eventuele override, verdedigend nopen (in welke situatie gebruik je een Nope als je direct wordt aangevallen?), multinope
-* ATTACK: track hoeveel attacks er op elkaar zijn gespeeld in de state? (Eerste attack = repeating turns naar 1, daarna is het repeat_turns + num_attacks*2, wordt gereset zodra speler wisselt aan einde loop)
-* Meer speelstrategieën
+* Kijk nog eens naar de Future strategieën => Nooit gebruiken als je niet een anti-kaart hebt of EEN manier om het te veranderen?
+* De Nope is ook wat matig. "Pass" is de enige waarbij de andere twee kansen überhaupt uitmaken, dat voelt wat karig.
+* Nog meer speelstrategieën
 * GEBRUIK de andere soorten plots (van spelverloop) om te testen of de simulatie wel fatsoenlijk werkt
 * Algemeen
   * Breng de "fixed strategy player 0" code terug
@@ -28,6 +21,9 @@ ctx.draw_series(LineSeries::new(
 ))
 .unwrap();
 
+== TOEKOMSTIGE TO DO ==
+* Kijk nog eens naar hoe Attack is ingebouwd en of dat nou 100% klopt met de spelregels.
+* 
 
 == NOPE ==
 X Willekeurig = Kans 10% (there are many occasions for noping, so a lower value is more logical)
@@ -68,21 +64,10 @@ X Als de speler voor jou een Kitten heeft terug gestopt, ga ervan uit dat ie bov
 X Speel nooit een kaart
 X Speel altijd een kaart.
 X Speel altijd zoveel kaarten als je kan.
-
-TO DO: Als je weet dat er een Kitten aankomt, eerst proberen om met Combo's/Favor kaarten te verkrijgen die misschien helpen => Hoe integreer je dit makkelijk? Is dit dan hetzelfde voor alle spelers?
-
-Spaar je kaarten tot het einde van het spel (2-3 spelers over, weinig kaarten)
-Spaar je Attack en Skip kaarten tot het einde
+X Spaar je kaarten tot het einde van het spel, word dan agressief
+X Wees agressief aan het begin van het spel, spaar je kaarten aan het einde
 
 Probeer geen kaart te trekken als de kans op een Kitten boven een bepaald percentage uitkomt. (Kan je makkelijk uitrekenen, want je weet hoeveel Kittens erin zitten en mag de stapel tellen volgens de regels.) => Ik kan daarvoor gewoon het deck tellen
-
-Speel altijd "bekijk de stapel"-kaart als eerste, mits je iets kan veranderen.
-Speel alleen "bekijk de stapel"-kaarten als je onveilig bent (geen Defuse meer)
-
-Spaar je kaarten op, zodat je in één keer alles op iemand anders kan gooien. (Vooral van toepassing op Attack kaarten.)
-
-Als je een manier hebt om kaarten te stelen van een ander, gebruik die altijd.
-Als je een manier hebt om kaarten te stelen van een ander, gebruik die nooit.
 
 Copycat: Als de vorige speler geen kaart heeft getrokken, probeer dan zelf ook geen kaart te trekken
 Bluf: als je "see the future" aangeeft dat er géén kitten aankomt, speel alsnog een kaart alsof dat wél zo is.

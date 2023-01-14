@@ -26,7 +26,7 @@ impl Combos
     pub fn wait_for_threes(strat:&Strat) -> bool
     {
         let pref_strat = *strat.get("combo_pref").unwrap();
-        if let Strategy::ComboType(tp) = pref_strat
+        if let Strategy::ComboPref(tp) = pref_strat
         {
             let prob = ((tp as usize) as f64) / 15.0;
             let mut rng = rand::thread_rng();
@@ -37,8 +37,8 @@ impl Combos
 
     pub fn request_based_on_strategy(strat:&Strat) -> bool
     {
-        let combo_strat = *strat.get("combo_pref").unwrap();
-        if let Strategy::ComboType(tp) = combo_strat
+        let combo_strat = *strat.get("combo").unwrap();
+        if let Strategy::Combo(tp) = combo_strat
         {
             let prob = ((tp as usize) as f64) / 15.0;
             let mut rng = rand::thread_rng();

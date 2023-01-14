@@ -240,6 +240,43 @@ impl Game
         // determine if we want to keep playing cards (can't if we don't HAVE any cards)
         if Helpers::count_playable_cards(&hands[num]) <= 0 { return false; }
 
+        /* Play strategy */
+        // This is "leading": if provides a max number of cards to play, regardless of whatever else happens 
+        let mut rng = rand::thread_rng();
+        let mut keep_playing:bool = false;
+        let mut force_keep_playing:bool = false;
+        let play_strat = *strat.get("play").unwrap();
+
+        match play_strat
+        {
+            Strategy::Play(StratPlay::Random) => {  keep_playing = rng.gen::<f64>() <= 0.5; }
+            Strategy::Play(StratPlay::Never) => { keep_playing = false; }
+            Strategy::Play(StratPlay::One) => { keep_playing = state.cards_played == 0; }
+            Strategy::Play(StratPlay::Two) => { keep_playing = state.cards_played < 2; }
+            Strategy::Play(StratPlay::Three) => { keep_playing = state.cards_played < 3; }
+            Strategy::Play(StratPlay::AsNeeded) => { keep_playing = true; }
+            Strategy::Play(StratPlay::All) => { keep_playing = true; force_keep_playing = true; }
+            Strategy::Play(StratPlay::OnlyAfterKitten) => { 
+                keep_playing = state.prev_exploded && !state.played_anti;
+            }
+            Strategy::Play(StratPlay::NotIfSafe) => {
+                keep_playing = !hands[num].contains(&Card::Defuse) && !state.played_anti;
+            }
+            Strategy::Play(StratPlay::AggroStart) => {
+                let many_players_left = hands.len() <= 2;
+                let many_cards_left = Helpers::count_total_cards(&hands) >= 10;
+                keep_playing = many_players_left || many_cards_left;
+            }
+            Strategy::Play(StratPlay::AggroLater) => {
+                let few_players_left = hands.len() <= 2;
+                let few_cards_left = Helpers::count_total_cards(&hands) < 8;
+                keep_playing = few_players_left || few_cards_left;
+            }
+            _ => {}
+        }
+
+        if !keep_playing { return false; }
+
         /* Anti-Kitten play */
         // only on turn start (first check)
         // if the previous player exploded, check how much we care
@@ -248,6 +285,9 @@ impl Game
             if Helpers::will_answer_previous_explosion(num, hands, strat)
             {
                 state.anti_play = true;
+                if !state.future_play && !state.saw_future { 
+                    state.future_play = Helpers::will_play_future(&hands[num], strat); 
+                }
             }
         }
 
@@ -261,7 +301,7 @@ impl Game
         if state.played_anti { state.anti_play = false; }
 
         // we want to make an anti play, but don't have the cards? don't keep playing
-        if state.anti_play && !Helpers::can_make_anti_play(&hands[num], strat)
+        if state.anti_play && !Helpers::can_make_anti_play(&hands[num], strat) && !force_keep_playing
         {
             return false;
         }
@@ -279,30 +319,8 @@ impl Game
         // If we want to make one of these plays, we have to continue playing cards (duh)
         if state.anti_play || state.future_play { return true; }
 
-        /* General strategy */
-        let mut rng = rand::thread_rng();
-        let mut keep_playing:bool = false;
-        let play_strat = *strat.get("play").unwrap();
-
-        match play_strat
-        {
-            Strategy::Play(StratPlay::Random) => { 
-                keep_playing = rng.gen::<f64>() <= 0.5;
-            }
-
-            Strategy::Play(StratPlay::Never) => { keep_playing = false; }
-            Strategy::Play(StratPlay::One) => { keep_playing = state.cards_played == 0; }
-            Strategy::Play(StratPlay::All) => { keep_playing = true; }
-            Strategy::Play(StratPlay::OnlyAfterKitten) => { 
-                keep_playing = state.prev_exploded && state.cards_played <= 0;
-            }
-            Strategy::Play(StratPlay::NotIfSafe) => {
-                keep_playing = !hands[num].contains(&Card::Defuse) && state.cards_played <= 0;
-            }
-            _ => {}
-        }
-
-        return keep_playing;
+        // if all else fails, we stop playing, unless we're forced
+        return force_keep_playing;
     }
 
     pub fn pick_card_to_play(num:usize, hands:&Vec<Hand>, strat:&Strat, state:&mut GameState) -> Vec<Combo>
@@ -384,29 +402,23 @@ impl Game
         playable_hand = Combos::remove_combo_cards(&playable_hand);
         if playable_hand.len() <= 0 { return cards_to_play; }
 
-        // otherwise let our strategy decide
-        // TO DO => this is incorrect right now, because it considers ALL strategies, not just the play ones right?
-        let play_strat = *strat.get("play").unwrap();
-        match play_strat
-        {
-            _ => { 
-                let range = 0..playable_hand.len();
-                let rand_idx = rng.gen_range(range);
-                cards_to_play.push((playable_hand[rand_idx], 1));
-                playable_hand.remove(rand_idx);
-            }
-        }
+        // otherwise play a random card
+        // TO DO: might make play strategy decide, or a new strategy type, but I just don't see enough options for this anymore
+        let range = 0..playable_hand.len();
+        let rand_idx = rng.gen_range(range);
+        cards_to_play.push((playable_hand[rand_idx], 1));
+        playable_hand.remove(rand_idx);
 
         return cards_to_play;
     }
 
-    pub fn was_noped(num:usize, hands:&mut Vec<Hand>, card: Combo, strategies:&Vec<Strat>) -> bool
+    pub fn was_noped(num:usize, hands:&mut Vec<Hand>, card: Combo, strategies:&Vec<Strat>, victim: Option<usize>) -> bool
     {
         // random order is necessary, because ANYONE can nope, so no preference should be given
         let player_order:Vec<usize> = Helpers::get_random_player_order(hands.len());
         let mut num_nopes:usize = 0;
 
-        let is_combo = card.1 > 1; // TO DO: use this for something?? A strategy that only nopes COMBOS
+        let is_combo = card.1 > 1; // TO DO: use this for something?? A strategy that only nopes COMBOS? Favor noping combos?
 
         loop 
         {
@@ -420,6 +432,7 @@ impl Game
                 if !nope_active && idx == num { continue; } // won't nope ourself
 
                 let mut direct_attack = Helpers::is_direct_attack(num, idx, card, hands.len());
+                if victim.is_some() { direct_attack = idx == victim.unwrap(); }
                 if nope_active { direct_attack = idx == num; } // but we can un-nope ourself
                 
                 if Nope::opponent_will_nope(idx, card, hands, &strategies[idx], direct_attack) {
@@ -443,7 +456,7 @@ impl Game
 
         let mut rng = rand::thread_rng();
 
-        let was_noped = Game::was_noped(num, hands, combo, strategies);
+        let was_noped = Game::was_noped(num, hands, combo, strategies, None);
         if was_noped { return true; } // nope destroys the original card, even though it was never "played"
 
         let strat = &strategies[num];
@@ -451,13 +464,13 @@ impl Game
         // check combos
         if combo.1 == 2
         {
-            Game::steal_card(num, hands, &strat, state, false);
+            Game::steal_card(num, hands, combo, &strat, state, false, strategies);
             return true;
         }
 
         if combo.1 == 3
         {
-            Game::steal_card(num, hands, &strat, state, true);
+            Game::steal_card(num, hands, combo, &strat, state, true, strategies);
             return true;
         }
 
@@ -475,7 +488,7 @@ impl Game
                 state.played_anti = true;
             }
             Card::Favor => {
-                Game::steal_card(num, hands, &strat, state, false);
+                Game::steal_card(num, hands, combo, &strat, state, false, strategies);
             }
             Card::Attack => { 
                 state.skip_draw = true;
@@ -502,7 +515,7 @@ impl Game
         return true;
     }
 
-    pub fn steal_card(num:usize, hands:&mut Vec<Hand>, strat:&Strat, state:&mut GameState, need_to_request_card:bool)
+    pub fn steal_card(num:usize, hands:&mut Vec<Hand>, combo:Combo, strat:&Strat, state:&mut GameState, need_to_request_card:bool, strategies:&Vec<Strat>)
     {
         // only consider players that are not us AND that have cards
         let player_count = hands.len();
@@ -537,16 +550,14 @@ impl Game
                 requested_card = Card::Future;
             }
 
-            // TO DO: there are a few play strategies that focus on anti-kitten cards
-            // Identify those here, then request a random anti-card
-    
             if state.steal_card
             {
                 requested_card = state.wanted_card;
             }
         }
 
-        // TO DO: The PickOne and PickDiverse strats aren't 100% correct, because indices of players CHANGE as players are killed ...
+        // TO DO: The PickOne and PickDiverse strats aren't 100% correct, 
+        // because indices of players CHANGE as players are killed ...
         let victim_strat = *strat.get("victim").unwrap();
         match victim_strat
         {
@@ -604,7 +615,13 @@ impl Game
             _ => {}
         }
 
-        // TO DO: Ability to NOPE this shit
+        // players can nope the steal action
+        // TO DO: it's a direct attack if you're the victim, pass that to this function
+        let was_noped = Game::was_noped(num, hands, combo, strategies, Some(idx));
+        if was_noped { return; } 
+
+        let victim_now_has_no_cards = hands[idx].len() <= 0;
+        if victim_now_has_no_cards { return; }
 
         // get index of requested card, or do nothing if the other player doesn't have it
         let mut steal_idx = rng.gen_range(0..hands[idx].len());
