@@ -1,3 +1,4 @@
+use enum_iterator::all;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 
@@ -36,6 +37,11 @@ impl Helpers
             arr.push(v.clone());
         }
         return arr;
+    }
+
+    pub fn get_all_possible_cards() -> Vec<Card>
+    {
+        return all::<Card>().collect::<Vec<_>>();
     }
 
     pub fn count_total_cards(cards:&Vec<Hand>) -> usize
@@ -125,12 +131,14 @@ impl Helpers
         {
             Strategy::Future(StratFuture::Random) => { response = rng.gen::<f64>() <= 0.5; }
             Strategy::Future(StratFuture::Never) => { response = false; }
-            Strategy::Future(StratFuture::Changable) => {
+            Strategy::Future(StratFuture::Rarely) => { response = rng.gen::<f64>() <= 0.25; }
+            Strategy::Future(StratFuture::InstaChange) => {
                 response = Helpers::get_anti_kitten_cards(my_hand).len() > 0;
             }
             Strategy::Future(StratFuture::Defuseless) => {
                 response = !my_hand.contains(&Card::Defuse);
             }
+            Strategy::Future(StratFuture::Often) => { response = rng.gen::<f64>() <= 0.75; }
             Strategy::Future(StratFuture::Always) => { response = true; }
             _ => {}
         }

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use enum_iterator::all;
 
-use crate::{config::{SimConfig}, game::Game, results::SimResults, strats::{StratCombo, StratNope, StratPlay, Strat, StratKitten, StratVictim, StratList, Strategy, StratComboPref, StratComboType, StratAnswer, StratFuture, StratNopeDefend, StratNopeCustom}, helpers::Helpers};
+use crate::{config::{SimConfig}, game::Game, results::SimResults, strats::{StratCombo, StratNope, StratPlay, Strat, StratKitten, StratVictim, StratList, Strategy, StratComboPref, StratComboType, StratAnswer, StratFuture, StratNopeDefend, StratNopeCustom, Hand}, helpers::Helpers};
 
 pub struct Simulator {}
 
@@ -40,6 +40,7 @@ impl Simulator
 
         SimResults {
             wins_per_player: Vec::new(),
+            winning_cards: Vec::new(),
             options,
             strats
         }
@@ -60,9 +61,14 @@ impl Simulator
         return sim_results;
     }
 
-    pub fn save_results(res:&mut SimResults, num: usize, strat:Strat)
+    pub fn save_results(res:&mut SimResults, num: usize, strat:Strat, starting_hand:Hand)
     {
         res.wins_per_player.push(num);
+
+        for v in starting_hand.iter()
+        {
+            res.winning_cards.push(*v);
+        }
 
         for (k,v) in strat.iter()
         {

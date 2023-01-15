@@ -16,6 +16,8 @@ mod strats;
 mod combos;
 mod nope;
 
+mod display;
+
 fn main() {
     let sim_config = SimConfig::new();
     let sim_results = Simulator::simulate(&sim_config);

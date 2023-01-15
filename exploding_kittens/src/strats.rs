@@ -36,7 +36,7 @@ impl fmt::Display for Strategy {
 pub type Strat = HashMap<String, Strategy>;
 pub type StratList = HashMap<String, Vec<Strategy>>;
 
-#[derive(Eq, PartialEq, Hash, Copy, Clone, Debug)]
+#[derive(Eq, PartialEq, Hash, Copy, Clone, Debug, Sequence)]
 pub enum Card {
     Defuse,
     Kitten,
@@ -51,6 +51,12 @@ pub enum Card {
     Potatocat,
     Rainbowcat,
     Tacocat
+}
+
+impl fmt::Display for Card {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(self, f)
+    }
 }
 
 pub type Hand = Vec<Card>;
@@ -93,8 +99,10 @@ pub enum StratAnswer {
 pub enum StratFuture {
     Random,
     Never,
+    Rarely,
     Defuseless,
-    Changable,
+    InstaChange,
+    Often,
     Always
 }
 

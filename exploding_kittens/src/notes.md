@@ -1,17 +1,14 @@
-TO DO:
-* TESTS voor de COMBO functies
-* Kijk nog eens naar de Future strategieën => Nooit gebruiken als je niet een anti-kaart hebt of EEN manier om het te veranderen?
-* De Nope is ook wat matig. "Pass" is de enige waarbij de andere twee kansen überhaupt uitmaken, dat voelt wat karig.
-* Nog meer speelstrategieën
-* GEBRUIK de andere soorten plots (van spelverloop) om te testen of de simulatie wel fatsoenlijk werkt
-* Algemeen
-  * Breng de "fixed strategy player 0" code terug
-  * Bijhouden welke _beginkaarten_ de winnende speler had, misschien is dat interessante data?
-  * Gebruik de debugger op iets meer plekken
-  * Kan ik nog andere getalletjes bijhouden die interessant zijn? Zoals "kans dat je wint als jij een tweede defuse kaart weet te trekken" of "kans dat je wint afhankelijk van met hoeveel Nope kaarten je begint"
-  * Vind een manier om het verloop van een potje in een grafiek of tabel te zetten? (Is mooi én goede check)
+== TOEKOMSTIGE TO DO ==
+* Strategieën
+  * Veel meer (gedetailleerde) speelstrategieën
+  * Future nog eens bekijken?
+* Misschien switchen naar deze crate voor het tekenen van de filmpjes. (Tiny-Skia lijkt sneller en meer actief dan Raqote.)
+  * https://github.com/RazrFalcon/tiny-skia/blob/master/examples/fill.rs 
+* Kijk nog eens naar hoe Attack is ingebouwd en of dat nou 100% klopt met de spelregels.
+* Misschien nog wat meer getalletjes en grafieken. Ik bedoel, als we de simulatie toch hebben ...
+* Schrijf TESTS voor de COMBO functies en meer specifieke strategieën
 
-Dat kan zo ongeveer:
+Zo kan je ongeveer een lijnplot maken (meerdere lijnen, verloop van potje over tijd)
 
 data = <lijst met hoeveel kaarten elke speler in deze ronde had>
 offset = afstand tussen punten
@@ -20,10 +17,6 @@ ctx.draw_series(LineSeries::new(
     &BLUE,
 ))
 .unwrap();
-
-== TOEKOMSTIGE TO DO ==
-* Kijk nog eens naar hoe Attack is ingebouwd en of dat nou 100% klopt met de spelregels.
-* 
 
 == NOPE ==
 X Willekeurig = Kans 10% (there are many occasions for noping, so a lower value is more logical)

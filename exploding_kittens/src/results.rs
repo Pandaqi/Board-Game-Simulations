@@ -1,10 +1,11 @@
-use crate::{helpers::Helpers, config::{SimConfig}, strats::StratList};
+use crate::{helpers::{Helpers}, config::{SimConfig}, strats::{StratList, Card}};
 
 use plotters::{prelude::*};
 use std::{ops::Range};
 
 pub struct SimResults {
     pub wins_per_player: Vec<usize>,
+    pub winning_cards: Vec<Card>,
     pub options: StratList,
     pub strats: StratList,
 }
@@ -21,6 +22,11 @@ impl Results
             let player_wins = Helpers::to_string_list(&res.wins_per_player);
             let player_options = Helpers::to_string_list(&vec![0,1,2,3]); // TO DO: update to actually used player count    
             Results::to_histogram(cfg, "per_player_check", player_wins, player_options);
+            
+            let card_wins = Helpers::to_string_list(&res.winning_cards);
+            let card_options = Helpers::to_string_list(Helpers::get_all_possible_cards());
+            Results::to_histogram(cfg, "per_starting_card", card_wins, card_options);
+            
             return;
         }
 
@@ -62,6 +68,5 @@ impl Results
             .margin(5)
             .data(data.iter().map(|x| (x, 1)))
         ).unwrap();
-    
     }
 }

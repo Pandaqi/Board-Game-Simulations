@@ -35,9 +35,8 @@ impl Nope
         if !hands[num].contains(&Card::Nope) { return false; }
 
         let wants_to_nope = Nope::play_based_on_strategy(strat) || (direct_attack && Nope::defend_based_on_strategy(strat));
+        
         let nope_custom_strat = *strat.get("nope_custom").unwrap();
-        if nope_custom_strat == Strategy::NopeCustom(StratNopeCustom::Pass) { return wants_to_nope; }
-
         let mut override_nope:bool = false;
         match nope_custom_strat
         {
@@ -53,6 +52,6 @@ impl Nope
             _ => {}
         }
 
-        return override_nope;
+        return override_nope || wants_to_nope;
     }
 }

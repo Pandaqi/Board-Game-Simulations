@@ -1,6 +1,6 @@
 use rand::{Rng, seq::SliceRandom};
 
-use crate::{config::{SimConfig}, results::SimResults, helpers::{Helpers, CARD_DATA}, simulator::Simulator, strats::{Card, Strat, Hand, StratKitten, StratPlay, StratVictim, Combo, Strategy, StratList}, combos::Combos, nope::Nope};
+use crate::{config::{SimConfig}, results::{SimResults, Results}, helpers::{Helpers, CARD_DATA}, simulator::Simulator, strats::{Card, Strat, Hand, StratKitten, StratPlay, StratVictim, Combo, Strategy, StratList}, combos::Combos, nope::Nope, display::Display};
 
 pub struct Debugger {
     pub enabled: bool
@@ -122,7 +122,11 @@ impl Game
         // This speeds up generation and lookup a lot (no need to skip inactive players all the time)
         // But players_alive is needed to remember the original player _number_ of whoever is left
         let mut hands = dealing_result.0;
+        let starting_hands = hands.clone();
         let mut strategies: Vec<Strat> = Game::generate_random_strategies(player_count, &res.options);
+
+        if cfg.track_per_player { strategies[0] = cfg.fixed_strat.clone(); }
+
         let mut players_alive: Vec<usize> = (0..player_count).collect();
 
         let mut game_is_over: bool = false;
@@ -137,10 +141,20 @@ impl Game
         debugger.print("== NEW GAME ==");
         debugger.print(&strategies);
         debugger.print(&hands);
+
+        let mut turn_num:usize = 0;
+        let mut display = Display::new();
+        display.set_font_size(20.0);
         
         while !game_is_over
         {
             cur_player = cur_player % players_alive.len();
+            turn_num += 1;
+            
+            if cfg.create_gamestate_video
+            {
+                display.save_gamestate_to_png(turn_num, &hands, &players_alive);
+            }
 
             debugger.println();
             debugger.print("= NEW TURN =");
@@ -175,7 +189,7 @@ impl Game
 
             // repeat a turn by not changing the player
             state.prev_exploded = draw_result == DrawResult::Defuse;
-            if game_is_over { state.repeat_turns = 0; }
+            if game_is_over || state.prev_exploded { state.repeat_turns = 0; }
             if state.repeat_turns > 0 { 
                 state.repeat_turns -= 1;
                 debugger.print("Repeating turn");
@@ -188,7 +202,14 @@ impl Game
 
         let winning_player = players_alive[0];
         let winning_strategy:Strat = strategies[0].clone();
-        Simulator::save_results(res, winning_player, winning_strategy);
+        let winning_hand:Hand = starting_hands[0].clone();
+        Simulator::save_results(res, winning_player, winning_strategy, winning_hand);
+        
+        if cfg.create_gamestate_video
+        {
+            display.save_gamestate_to_png(turn_num, &hands, &players_alive);
+        }
+
     }
 
     pub fn kill_player(num:usize, hands:&mut Vec<Hand>, players_alive:&mut Vec<usize>, strategies:&mut Vec<Strat>, state: &mut GameState)
@@ -239,6 +260,7 @@ impl Game
     {
         // determine if we want to keep playing cards (can't if we don't HAVE any cards)
         if Helpers::count_playable_cards(&hands[num]) <= 0 { return false; }
+        if state.skip_draw { return false; }
 
         /* Play strategy */
         // This is "leading": if provides a max number of cards to play, regardless of whatever else happens 
@@ -285,7 +307,7 @@ impl Game
             if Helpers::will_answer_previous_explosion(num, hands, strat)
             {
                 state.anti_play = true;
-                if !state.future_play && !state.saw_future { 
+                if !state.future_play && !state.saw_future && Helpers::can_make_future_play(&hands[num], strat) { 
                     state.future_play = Helpers::will_play_future(&hands[num], strat); 
                 }
             }
