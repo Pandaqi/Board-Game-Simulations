@@ -1,22 +1,20 @@
 use rand::{Rng, seq::SliceRandom};
 
-use crate::{config::{SimConfig}, results::{SimResults, Results}, helpers::{Helpers, CARD_DATA}, simulator::Simulator, strats::{Card, Strat, Hand, StratKitten, StratPlay, StratVictim, Combo, Strategy, StratList}, combos::Combos, nope::Nope, display::Display};
+use crate::{config::{CONFIG}, results::{SimResults}, helpers::{Helpers, CARD_DATA}, simulator::Simulator, strats::{Card, Strat, Hand, StratKitten, StratPlay, StratVictim, Combo, Strategy, StratList}, combos::Combos, nope::Nope, display::Display};
 
-pub struct Debugger {
-    pub enabled: bool
-}
+pub struct Debugger {}
 
 impl Debugger 
 {
-    fn print<T>(&self, txt:T) where T: std::fmt::Debug
+    fn print<T>(txt:T) where T: std::fmt::Debug
     {
-        if !self.enabled { return; }
+        if !CONFIG.print_gameplay { return; }
         println!("{:#?}", txt);
     }
 
-    fn println(&self)
+    fn println()
     {
-        if !self.enabled { return; }
+        if !CONFIG.print_gameplay { return; }
         println!("");
     }
 }
@@ -50,6 +48,8 @@ pub struct GameState {
     pub prev_exploded: bool,
     pub exploded: Vec<bool>,
     pub prev_victim: Vec<usize>,
+
+    pub turn_summary: Vec<String>
 }
 
 impl GameState
@@ -69,7 +69,8 @@ impl GameState
             wanted_card: Card::Defuse,
             prev_exploded: false,
             exploded: Vec::new(),
-            prev_victim: Vec::new()
+            prev_victim: Vec::new(),
+            turn_summary: Vec::new()
         }
     }
 
@@ -110,10 +111,10 @@ impl Game
         self.all_cards = Helpers::generate_deck();
     }
 
-    pub fn play(&self, cfg:&SimConfig, res:&mut SimResults)
+    pub fn play(&self, res:&mut SimResults)
     {
-        let mut player_count = cfg.player_count;
-        if cfg.randomize_player_count { player_count = Helpers::get_random_player_count(); }
+        let mut player_count = CONFIG.player_count;
+        if CONFIG.randomize_player_count { player_count = Helpers::get_random_player_count(); }
 
         let dealing_result = Game::create_player_hands(player_count, self.all_cards.clone());
         let mut deck = dealing_result.1;
@@ -125,7 +126,7 @@ impl Game
         let starting_hands = hands.clone();
         let mut strategies: Vec<Strat> = Game::generate_random_strategies(player_count, &res.options);
 
-        if cfg.track_per_player { strategies[0] = cfg.fixed_strat.clone(); }
+        if CONFIG.track_per_player { strategies[0] = CONFIG.fixed_strat.clone(); }
 
         let mut players_alive: Vec<usize> = (0..player_count).collect();
 
@@ -135,67 +136,83 @@ impl Game
         let mut state = GameState::new();
         state.init(player_count);
 
-        let debugger = Debugger { enabled: cfg.print_gameplay };
+        Debugger::println();
+        Debugger::print("== NEW GAME ==");
+        Debugger::print(&strategies);
+        Debugger::print(&hands);
 
-        debugger.println();
-        debugger.print("== NEW GAME ==");
-        debugger.print(&strategies);
-        debugger.print(&hands);
-
-        let mut turn_num:usize = 0;
+        let mut turn_num:usize = 1;
         let mut display = Display::new();
         display.set_font_size(20.0);
+
+        state.turn_summary = vec!["Game start!".to_owned()];
+        display.save_gamestate_to_png(turn_num, &hands, &players_alive, cur_player, &state);
         
         while !game_is_over
         {
             cur_player = cur_player % players_alive.len();
             turn_num += 1;
-            
-            if cfg.create_gamestate_video
-            {
-                display.save_gamestate_to_png(turn_num, &hands, &players_alive);
-            }
 
-            debugger.println();
-            debugger.print("= NEW TURN =");
-            debugger.print("Current player?");
-            debugger.print(cur_player);
+            state.turn_summary = Vec::new();
 
-            Game::play_cards(cur_player, &mut hands, &mut deck, &strategies, &mut state, &debugger);
-            
+            Debugger::println();
+            Debugger::print("= NEW TURN =");
+            Debugger::print("Current player?");
+            Debugger::print(cur_player);
+
+            Game::play_cards(cur_player, &mut hands, &mut deck, &strategies, &mut state);
+
             if state.skip_draw { 
-                cur_player += 1;
+                Debugger::print("Skipped draw");
+                state.turn_summary.push("Skipped draw".to_owned());
+                display.save_gamestate_to_png(turn_num, &hands, &players_alive, cur_player, &state);
                 state.reset();
-                debugger.print("Skipped draw");
+                cur_player += 1;
                 continue; 
             }
 
-            let draw_result:DrawResult = Game::draw_card(cur_player, &mut hands, &mut deck, &debugger);
+            let draw_result:DrawResult = Game::draw_card(cur_player, &mut hands, &mut deck);
             match draw_result 
             {
                 DrawResult::Death => { 
-                    debugger.print("Draw => death");
+                    Debugger::print("Draw => death");
+                    state.turn_summary.push("Drew kitten; Dead".to_owned());
                     Game::kill_player(cur_player, &mut hands, &mut players_alive, &mut strategies, &mut state); 
                 }
                 DrawResult::Defuse => { 
-                    debugger.print("Draw => Defuse");
+                    Debugger::print("Draw => Defuse");
+                    state.turn_summary.push("Drew kitten; Defused".to_owned());
                     Game::put_back_kitten(cur_player, &hands, &mut deck, &strategies[cur_player], &state); 
                 }
-                _ => { }
+                _ => { 
+                    let drawn_card = *hands[cur_player].last().unwrap();
+                    state.turn_summary.push("Drew: ".to_owned() + &drawn_card.to_string());
+                }
             }
 
             game_is_over = players_alive.len() <= 1;
-            state.reset();
 
             // repeat a turn by not changing the player
             state.prev_exploded = draw_result == DrawResult::Defuse;
-            if game_is_over || state.prev_exploded { state.repeat_turns = 0; }
-            if state.repeat_turns > 0 { 
+            if game_is_over { state.repeat_turns = 0; }
+   
+            state.reset();
+            if state.repeat_turns > 0 {
+                Debugger::print("Repeating turn");
+                Debugger::print(state.repeat_turns);
+                state.turn_summary.push("Repeating turn".to_owned());
+            }
+
+            display.save_gamestate_to_png(turn_num, &hands, &players_alive, cur_player, &state);
+            
+            if state.repeat_turns > 0 
+            { 
                 state.repeat_turns -= 1;
-                debugger.print("Repeating turn");
-                debugger.print(state.repeat_turns);
                 continue;
             }
+
+            // if we increase player num on death, we actually SKIP a player!
+            if draw_result == DrawResult::Death { continue; } 
 
             cur_player += 1;
         }
@@ -204,12 +221,6 @@ impl Game
         let winning_strategy:Strat = strategies[0].clone();
         let winning_hand:Hand = starting_hands[0].clone();
         Simulator::save_results(res, winning_player, winning_strategy, winning_hand);
-        
-        if cfg.create_gamestate_video
-        {
-            display.save_gamestate_to_png(turn_num, &hands, &players_alive);
-        }
-
     }
 
     pub fn kill_player(num:usize, hands:&mut Vec<Hand>, players_alive:&mut Vec<usize>, strategies:&mut Vec<Strat>, state: &mut GameState)
@@ -221,7 +232,7 @@ impl Game
         state.prev_victim.remove(num);
     }
 
-    fn play_cards(num:usize, hands:&mut Vec<Hand>, deck:&mut Vec<Card>, strategies:&Vec<Strat>, state:&mut GameState, debugger:&Debugger)
+    fn play_cards(num:usize, hands:&mut Vec<Hand>, deck:&mut Vec<Card>, strategies:&Vec<Strat>, state:&mut GameState)
     {
         let strat = &strategies[num];
 
@@ -229,30 +240,35 @@ impl Game
         {
             if !Game::wants_to_continue_turn(num, hands, &strat, state) { break; }
 
-            let mut cards_to_play = Game::pick_card_to_play(num, hands, &strat, state);
-            if cards_to_play.len() <= 0 { break; }
+            let card_to_play:Option<Combo> = Game::pick_card_to_play(num, hands, &strat, state);
+            if card_to_play.is_none() { break; }
 
-            debugger.print("Chosen cards to play");
-            debugger.print(&cards_to_play);
+            // play the chosen card(s)
+            let combo = card_to_play.unwrap();
 
-            // play the chosen cards
-            while cards_to_play.len() > 0
-            {
-                let combo = cards_to_play.pop().unwrap();
-                let success = Game::execute_card(num, hands, combo, deck, strategies, state);
-                if !success { continue; }
-
-                for _i in 0..combo.1
-                {
-                    let idx = Helpers::get_index(combo.0, &hands[num]);
-                    hands[num].remove(idx);
-                }
-                
-                state.cards_played += 1;
+            // merely for debugging/drawing
+            if combo.1 == 1 {
+                state.turn_summary.push("Played: ".to_owned() + &combo.0.to_string());
+            } else {
+                state.turn_summary.push("Played: ".to_owned() + &combo.0.to_string() + " (x" + &combo.1.to_string() + ")");
             }
 
-            debugger.print("Remaining hand");
-            debugger.print(&hands[num]);
+            let success = Game::execute_card(num, hands, combo, deck, strategies, state);
+            if !success { continue; }
+
+            for _i in 0..combo.1
+            {
+                let idx = Helpers::get_index(combo.0, &hands[num]);
+                hands[num].remove(idx);
+            }
+            
+            state.cards_played += combo.1;
+
+            Debugger::print("Chosen card to play");
+            Debugger::print(&card_to_play);
+
+            Debugger::print("Remaining hand");
+            Debugger::print(&hands[num]);
         }
     }
 
@@ -266,7 +282,7 @@ impl Game
         // This is "leading": if provides a max number of cards to play, regardless of whatever else happens 
         let mut rng = rand::thread_rng();
         let mut keep_playing:bool = false;
-        let mut force_keep_playing:bool = false;
+        let mut only_play_as_needed:bool = true;
         let play_strat = *strat.get("play").unwrap();
 
         match play_strat
@@ -277,7 +293,7 @@ impl Game
             Strategy::Play(StratPlay::Two) => { keep_playing = state.cards_played < 2; }
             Strategy::Play(StratPlay::Three) => { keep_playing = state.cards_played < 3; }
             Strategy::Play(StratPlay::AsNeeded) => { keep_playing = true; }
-            Strategy::Play(StratPlay::All) => { keep_playing = true; force_keep_playing = true; }
+            Strategy::Play(StratPlay::All) => { keep_playing = true; only_play_as_needed = false; }
             Strategy::Play(StratPlay::OnlyAfterKitten) => { 
                 keep_playing = state.prev_exploded && !state.played_anti;
             }
@@ -323,7 +339,7 @@ impl Game
         if state.played_anti { state.anti_play = false; }
 
         // we want to make an anti play, but don't have the cards? don't keep playing
-        if state.anti_play && !Helpers::can_make_anti_play(&hands[num], strat) && !force_keep_playing
+        if state.anti_play && !Helpers::can_make_anti_play(&hands[num], strat) && only_play_as_needed
         {
             return false;
         }
@@ -341,28 +357,26 @@ impl Game
         // If we want to make one of these plays, we have to continue playing cards (duh)
         if state.anti_play || state.future_play { return true; }
 
-        // if all else fails, we stop playing, unless we're forced
-        return force_keep_playing;
+        // if we only play when absolutely needed, do nothing if we're fine
+        if only_play_as_needed && !(state.anti_play || state.future_play) { return false; }
+
+        return true;
     }
 
-    pub fn pick_card_to_play(num:usize, hands:&Vec<Hand>, strat:&Strat, state:&mut GameState) -> Vec<Combo>
+    pub fn pick_card_to_play(num:usize, hands:&Vec<Hand>, strat:&Strat, state:&mut GameState) -> Option<Combo>
     {
         // determine what we want to play
-        let mut cards_to_play:Vec<Combo> = Vec::new();
         let mut playable_hand = Helpers::get_playable_cards(&hands[num]);
-        let mut rng = rand::thread_rng();
+        if playable_hand.len() <= 0 { return None; }
 
-        if playable_hand.len() <= 0 { return Vec::new(); }
+        let mut rng = rand::thread_rng();
 
         /* Future */
         if state.future_play 
         { 
             if playable_hand.contains(&Card::Future) 
             {
-                let future_card_idx = Helpers::get_index(Card::Future, &playable_hand);
-                cards_to_play.push((Card::Future, 1));
-                playable_hand.remove(future_card_idx);
-                return cards_to_play;
+                return Some((Card::Future, 1));
             } else {
                 state.steal_card = true;
                 state.wanted_card = Card::Future;
@@ -377,11 +391,8 @@ impl Game
         
             if has_anti_card
             {
-                let anti_card = arr[0];
-                let anti_card_idx = Helpers::get_index(anti_card, &playable_hand);
-                cards_to_play.push((anti_card, 1));
-                playable_hand.remove(anti_card_idx);
-                return cards_to_play;
+                let anti_card = *arr.choose(&mut rng).unwrap();
+                return Some((anti_card, 1));
             } else {
                 state.steal_card = true;
                 state.wanted_card = Helpers::get_random_anti_card();
@@ -395,14 +406,9 @@ impl Game
         {
             if playable_hand.contains(&Card::Favor)
             {
-                let favor_card_idx = Helpers::get_index(Card::Favor, &playable_hand);
-                cards_to_play.push((Card::Favor, 1));
-                playable_hand.remove(favor_card_idx); 
-                return cards_to_play;       
+                return Some((Card::Favor, 1));  
             }
         }
-
-        if playable_hand.len() <= 0 { return cards_to_play; }
 
         /* Combos */
         let mut play_combo:bool = false;
@@ -413,25 +419,18 @@ impl Game
             play_combo = Combos::want_to_play_combo(combo.unwrap(), strat) || state.steal_card; 
         }
 
-        if play_combo 
-        { 
-            cards_to_play.push(combo.unwrap()); 
-            return cards_to_play;
-        }
+        if play_combo { return combo; }
         
         // if we don't play a combo, those cards are useless now
         // onwards, _exclude_ those cards from the playable hand 
         playable_hand = Combos::remove_combo_cards(&playable_hand);
-        if playable_hand.len() <= 0 { return cards_to_play; }
+        if playable_hand.len() <= 0 { return None; }
 
         // otherwise play a random card
         // TO DO: might make play strategy decide, or a new strategy type, but I just don't see enough options for this anymore
         let range = 0..playable_hand.len();
         let rand_idx = rng.gen_range(range);
-        cards_to_play.push((playable_hand[rand_idx], 1));
-        playable_hand.remove(rand_idx);
-
-        return cards_to_play;
+        return Some((playable_hand[rand_idx], 1));
     }
 
     pub fn was_noped(num:usize, hands:&mut Vec<Hand>, card: Combo, strategies:&Vec<Strat>, victim: Option<usize>) -> bool
@@ -466,6 +465,12 @@ impl Game
             }
 
             if num_nopes == old_num_nopes { break; }
+        }
+
+        if num_nopes > 0 
+        {
+            if num_nopes % 2 == 1 { Debugger::print("Action was noped!"); }
+            else { Debugger::print("Action was noped, then unnoped!"); }
         }
 
         let ended_on_a_nope = num_nopes % 2 == 1;
@@ -578,8 +583,7 @@ impl Game
             }
         }
 
-        // TO DO: The PickOne and PickDiverse strats aren't 100% correct, 
-        // because indices of players CHANGE as players are killed ...
+        // TO DO: The PickOne and PickDiverse strats aren't 100% correct => indices of players CHANGE as players are killed ...
         let victim_strat = *strat.get("victim").unwrap();
         match victim_strat
         {
@@ -637,8 +641,10 @@ impl Game
             _ => {}
         }
 
+        Debugger::print("Stealing card from player");
+        Debugger::print(idx);
+
         // players can nope the steal action
-        // TO DO: it's a direct attack if you're the victim, pass that to this function
         let was_noped = Game::was_noped(num, hands, combo, strategies, Some(idx));
         if was_noped { return; } 
 
@@ -649,22 +655,28 @@ impl Game
         let mut steal_idx = rng.gen_range(0..hands[idx].len());
         if need_to_request_card
         {
+            Debugger::print("Requesting card from victim");
+            Debugger::print(requested_card);
+
             if !hands[idx].contains(&requested_card) { return; }
             steal_idx = Helpers::get_index(requested_card, &hands[idx]);
+
+            Debugger::print("Request succesful!");
         }
 
         // finally, remove the card from our victim, add it to our hand
         let stolen_card = hands[idx].remove(steal_idx);
+        state.turn_summary.push("Stole: ".to_owned() + &stolen_card.to_string());
         hands[num].push(stolen_card);
     }
 
-    pub fn draw_card(num:usize, hands:&mut Vec<Hand>, deck:&mut Vec<Card>, debugger:&Debugger) -> DrawResult
+    pub fn draw_card(num:usize, hands:&mut Vec<Hand>, deck:&mut Vec<Card>) -> DrawResult
     {
         let card = deck.pop().unwrap();
         hands[num].push(card);
 
-        debugger.print("Card drawn");
-        debugger.print(card);
+        Debugger::print("Card drawn");
+        Debugger::print(card);
 
         if card != Card::Kitten { return DrawResult::None; }
         if !hands[num].contains(&Card::Defuse) { return DrawResult::Death; }

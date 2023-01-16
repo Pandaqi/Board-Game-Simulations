@@ -1,4 +1,4 @@
-use crate::{helpers::{Helpers}, config::{SimConfig}, strats::{StratList, Card}};
+use crate::{helpers::{Helpers}, config::{SimConfig, CONFIG}, strats::{StratList, Card}};
 
 use plotters::{prelude::*};
 use std::{ops::Range};
@@ -14,42 +14,47 @@ pub struct Results {}
 
 impl Results
 {
-    pub fn display(cfg: &SimConfig, res:SimResults)
+    pub fn display(res:SimResults)
     {
-        if !cfg.create_images { return; }
 
-        if cfg.track_per_player {
+        if CONFIG.track_per_player 
+        {
             let player_wins = Helpers::to_string_list(&res.wins_per_player);
-            let player_options = Helpers::to_string_list(&vec![0,1,2,3]); // TO DO: update to actually used player count    
-            Results::to_histogram(cfg, "per_player_check", player_wins, player_options);
-            
-            let card_wins = Helpers::to_string_list(&res.winning_cards);
-            let card_options = Helpers::to_string_list(Helpers::get_all_possible_cards());
-            Results::to_histogram(cfg, "per_starting_card", card_wins, card_options);
-            
-            return;
+            let player_options = Helpers::to_string_list(&(0..CONFIG.player_count).collect());
+            Results::to_histogram("per_player_check", player_wins, player_options);
         }
 
-        for(k,v) in res.options.iter()
+        if CONFIG.track_start_cards 
         {
-            let strats = Helpers::extract_inside_parentheses(Helpers::to_string_list(res.strats.get(k).unwrap()));
-            let options = Helpers::extract_inside_parentheses(Helpers::to_string_list(v));
-            Results::to_histogram(cfg, &k, strats, options);
+            let winning_cards = Helpers::compensate_for_card_frequency(&res.winning_cards);
+            let card_wins = Helpers::to_string_list(&winning_cards);
+            let card_options = Helpers::to_string_list(&Helpers::get_all_possible_cards());
+            Results::to_histogram("per_starting_card", card_wins, card_options);
+        }
+
+        if CONFIG.track_wins
+        {
+            for(k,v) in res.options.iter()
+            {
+                let strats = Helpers::extract_inside_parentheses(Helpers::to_string_list(res.strats.get(k).unwrap()));
+                let options = Helpers::extract_inside_parentheses(Helpers::to_string_list(v));
+                Results::to_histogram(&k, strats, options);
+            }
         }
     }
-    
-    
-    fn to_histogram(cfg:&SimConfig, file_key:&str, data:Vec<String>, x_values:Vec<String>)
+      
+    fn to_histogram(file_key:&str, data:Vec<String>, x_values:Vec<String>)
     {
-        let upper_bound = 2*( (cfg.num_iterations as f64) / (x_values.len() as f64) ).ceil() as i32;
+        let upper_bound = (4.0 * (data.len() as f64) / (x_values.len() as f64)) as i32;
         let y_values:Range<i32> = 0..upper_bound;
 
-        let file_path = "images/".to_owned() + &cfg.file_prefix.to_owned() + "_" + file_key + ".png";
+        let file_path = "images/".to_owned() + &CONFIG.file_prefix.to_owned() + "_" + file_key + ".png";
         let root_area = BitMapBackend::new(&file_path, (900, 600)).into_drawing_area();
         root_area.fill(&WHITE).unwrap();
     
         let mut graph_title = "Wins per ".to_owned() + file_key + " strategy";
-        if cfg.track_per_player { graph_title = "Wins per player".to_owned(); }
+        if CONFIG.track_per_player { graph_title = "Wins per player".to_owned(); }
+        if CONFIG.track_start_cards { graph_title = "Wins per start card".to_owned(); }
 
         let mut ctx = ChartBuilder::on(&root_area)
             .set_label_area_size(LabelAreaPosition::Left, 40)

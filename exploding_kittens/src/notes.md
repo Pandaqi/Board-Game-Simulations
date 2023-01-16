@@ -2,8 +2,6 @@
 * Strategieën
   * Veel meer (gedetailleerde) speelstrategieën
   * Future nog eens bekijken?
-* Misschien switchen naar deze crate voor het tekenen van de filmpjes. (Tiny-Skia lijkt sneller en meer actief dan Raqote.)
-  * https://github.com/RazrFalcon/tiny-skia/blob/master/examples/fill.rs 
 * Kijk nog eens naar hoe Attack is ingebouwd en of dat nou 100% klopt met de spelregels.
 * Misschien nog wat meer getalletjes en grafieken. Ik bedoel, als we de simulatie toch hebben ...
 * Schrijf TESTS voor de COMBO functies en meer specifieke strategieën

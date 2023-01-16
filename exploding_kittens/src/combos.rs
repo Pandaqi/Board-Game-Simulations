@@ -90,9 +90,6 @@ impl Combos
     {
         let wait_for_threes = Combos::wait_for_threes(strat);
         if wait_for_threes && combo.1 != 3 { return false; }
-
-        // TO DO: does it matter WHAT cards you're using for the combo? (Only cat cards, never special cards, etc.)
-
         return Combos::request_based_on_strategy(strat);
     }
     

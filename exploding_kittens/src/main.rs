@@ -19,7 +19,6 @@ mod nope;
 mod display;
 
 fn main() {
-    let sim_config = SimConfig::new();
-    let sim_results = Simulator::simulate(&sim_config);
-    Results::display(&sim_config, sim_results);
+    let sim_results = Simulator::simulate();
+    Results::display(sim_results);
 }

@@ -75,7 +75,7 @@ mod tests {
         let mut state = GameState::new();
         let mut strat = Helpers::generate_random_strategy(&options);
         strat.insert("play".to_owned(), Strategy::Play(StratPlay::Random));
-        assert_eq!(Game::pick_card_to_play(0, &hands, &strat, &mut state), vec![(Card::Attack, 1)]);
+        assert_eq!(Game::pick_card_to_play(0, &hands, &strat, &mut state), Some((Card::Attack, 1)));
         assert_eq!(hands[0].len(), 1);
 
         
@@ -114,7 +114,7 @@ mod tests {
         assert_eq!(hands[1].len(), 0);
 
         // attack should update state
-        // TO DO: later check for MULTIPLE attacks after each other, but how??
+        // TO DO: another check for MULTIPLE attacks after each other, but how??
         state = GameState::new();
         hands = vec![vec![Card::Attack]];
         Game::execute_card(num, &mut hands, (Card::Attack, 1), &mut deck, &strats, &mut state);
@@ -168,23 +168,22 @@ mod tests {
     {
         let mut hands:Vec<Hand> = vec![vec![Card::Defuse]];
         let mut deck:Vec<Card> = vec![Card::Kitten];
-        let debugger = Debugger { enabled: true };
 
         // defuse: should mean we lose the defuse card and top card of deck is gone
-        assert_eq!(Game::draw_card(0, &mut hands, &mut deck, &debugger), DrawResult::Defuse);
+        assert_eq!(Game::draw_card(0, &mut hands, &mut deck), DrawResult::Defuse);
         assert_eq!(hands[0].len(), 0);
         assert_eq!(deck.len(), 0);
 
         // no defuse card? always death
         hands = vec![vec![Card::Attack, Card::Nope]];
         deck = vec![Card::Kitten];
-        assert_eq!(Game::draw_card(0, &mut hands, &mut deck, &debugger), DrawResult::Death);
+        assert_eq!(Game::draw_card(0, &mut hands, &mut deck), DrawResult::Death);
 
         // anything else: you get an extra card and that's it
         hands = vec![Vec::new()];
         deck = vec![Card::Skip, Card::Shuffle];
 
-        assert_eq!(Game::draw_card(0, &mut hands, &mut deck, &debugger), DrawResult::None);
+        assert_eq!(Game::draw_card(0, &mut hands, &mut deck), DrawResult::None);
         assert_eq!(hands[0], vec![Card::Shuffle]);
         assert_eq!(deck, vec![Card::Skip]);
     }

@@ -49,6 +49,21 @@ impl Helpers
         return cards.iter().map(Vec::len).sum();
     }
 
+    // For each card type, we only save it in the new array once in a while
+    // The "a while" is equal to how frequent a card is (so more frequent cards are skipped more, compensating)
+    pub fn compensate_for_card_frequency(cards:&Vec<Card>) -> Vec<Card>
+    {
+        let mut map:HashMap<Card, usize> = HashMap::new();
+        let mut arr:Vec<Card> = Vec::new();
+        for v in cards.iter()
+        {
+            *map.entry(*v).or_insert(0) += 1;
+            if map.get(v).unwrap() % CARD_DATA[v].freq != 1 { continue; }
+            arr.push(*v);
+        }
+        return arr;
+    }
+
     pub fn generate_deck() -> Vec<Card>
     {
         // generate full deck

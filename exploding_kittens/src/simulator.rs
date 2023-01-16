@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use enum_iterator::all;
 
-use crate::{config::{SimConfig}, game::Game, results::SimResults, strats::{StratCombo, StratNope, StratPlay, Strat, StratKitten, StratVictim, StratList, Strategy, StratComboPref, StratComboType, StratAnswer, StratFuture, StratNopeDefend, StratNopeCustom, Hand}, helpers::Helpers};
+use crate::{config::{SimConfig, CONFIG}, game::Game, results::SimResults, strats::{StratCombo, StratNope, StratPlay, Strat, StratKitten, StratVictim, StratList, Strategy, StratComboPref, StratComboType, StratAnswer, StratFuture, StratNopeDefend, StratNopeCustom, Hand}, helpers::Helpers};
 
 pub struct Simulator {}
 
@@ -46,16 +46,19 @@ impl Simulator
         }
     }
 
-    pub fn simulate(cfg:&SimConfig) -> SimResults
+    pub fn simulate() -> SimResults
     {    
         let mut sim_results = Simulator::setup();
         let mut game:Game = Game::new();
         game.setup();
 
-        for n in 0..cfg.num_iterations
+        let num_sims = CONFIG.num_iterations;
+        let print_interval = CONFIG.print_interval;
+
+        for n in 0..num_sims
         {
-            if n % cfg.print_interval == 0 { println!("Playing game {}", n); }
-            game.play(cfg, &mut sim_results);
+            if n % print_interval == 0 { println!("Playing game {}", n); }
+            game.play(&mut sim_results);
         }
 
         return sim_results;
