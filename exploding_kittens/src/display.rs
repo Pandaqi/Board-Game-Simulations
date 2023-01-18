@@ -1,8 +1,8 @@
-use fontdue::{*, layout::{TextStyle, LayoutSettings, Layout, CoordinateSystem, CharacterData}};
+use fontdue::{*, layout::{TextStyle, LayoutSettings, Layout, CoordinateSystem}};
 //use raqote::*;
 use tiny_skia::*;
 
-use crate::{strats::{Hand, Card}, helpers::CARD_DATA, config::CONFIG, game::GameState};
+use crate::{strats::{Hand, Card, Strat}, helpers::{CARD_DATA, Helpers}, config::CONFIG, game::GameState};
 
 #[derive(Copy, Clone)]
 struct Pos {
@@ -11,7 +11,7 @@ struct Pos {
 }
 
 pub struct Display {
-    font:Font,
+    font:Option<Font>,
     font_size: f32,
 }
 
@@ -19,27 +19,22 @@ impl Display
 {
     pub fn new() -> Self
     {
-        let font = Display::load_font().unwrap();
+        let font = if CONFIG.create_gamestate_video { Display::load_font() } else { None };
         Self {
             font,
             font_size: 12.0
         }
     }
 
-    fn load_font() -> FontResult<Font> 
+    fn load_font() -> Option<Font> 
     {
         let font_data = include_bytes!("../assets/bebas_neue.otf") as &[u8];
         let settings = fontdue::FontSettings::default();
-        fontdue::Font::from_bytes(font_data, settings)
-    }
-
-    fn rgb_to_u32(red: usize, green: usize, blue: usize, alpha: usize) -> u32 
-    {
-        let r = red.clamp(0, 255);
-        let g = green.clamp(0, 255);
-        let b = blue.clamp(0, 255);
-        let a = alpha.clamp(0, 255);
-        ((a << 24) | (r << 16) | (g << 8) | b) as u32
+        let result = fontdue::Font::from_bytes(font_data, settings);
+        return match result {
+            Ok(res) => Some(res),
+            Err(_err) => None
+        }
     }
 
     pub fn set_font_size(&mut self, font_size_px:f32)
@@ -49,6 +44,8 @@ impl Display
 
     pub fn print_on_canvas(&self, dt:&mut Pixmap, content:&String, x: f32, y: f32, width: f32)
     {
+        if self.font.is_none() { return; }
+
         // prepare a layout for the text
         // (a text box: width, height, centering, font size)
         let mut layout = Layout::new(CoordinateSystem::PositiveYDown);
@@ -61,7 +58,7 @@ impl Display
             ..LayoutSettings::default()
         });
 
-        let fonts = [&self.font];
+        let fonts = [self.font.as_ref().unwrap()];
         layout.append(&fonts, &TextStyle::new(&content, self.font_size, 0));
 
         // now convert all glyps to images
@@ -69,7 +66,7 @@ impl Display
         for glyph in layout.glyphs() {
             if glyph.parent == ' ' { continue; }
 
-            let (metrics, coverage) = self.font.rasterize(glyph.parent, glyph.key.px);
+            let (metrics, coverage) = self.font.as_ref().unwrap().rasterize(glyph.parent, glyph.key.px);
 
             let mut glyph_pixmap:Pixmap = Pixmap::new(metrics.width as u32, metrics.height as u32).unwrap();
             //let mut image_data = Vec::with_capacity(coverage.len());
@@ -103,27 +100,52 @@ impl Display
         }
     }
 
+    pub fn put_strategies_to_png(&self, turn_num:usize, strategies:&Vec<Strat>)
+    {
+        if !CONFIG.create_gamestate_video { return; }
+
+        let mut dt = self.new_pixmap();
+        let positions = Display::get_circle_positions();
+
+        let key_match = vec!["answer", "combo", "nope", "future", "kitten", "play", "victim"];
+
+        for i in 0..CONFIG.player_count
+        {
+            let text_width = 200.0;
+            let text_height = self.font_size;
+            let text_x = positions[i].x - 0.5*text_width;
+            let mut text_y = positions[i].y - 0.5*(key_match.len() as f32)*text_height;
+
+            for (k,v) in strategies[i].iter()
+            {
+                if !key_match.contains(&&k[..]) { continue; }
+                let txt:String = k.clone() + ": " + &Helpers::extract_inside_parentheses_single(&v.to_string()); 
+                self.print_on_canvas(&mut dt, &txt, text_x, text_y, text_width);
+                text_y += text_height;
+            }
+        }
+
+        self.save_png(turn_num, dt);
+    }
+    
     pub fn save_gamestate_to_png(&self, turn_num:usize, hands:&Vec<Hand>, p_alive:&Vec<usize>, p_cur:usize, state:&GameState)
     {
         if !CONFIG.create_gamestate_video { return; }
 
-        let mut dt = Pixmap::new(960, 540).unwrap();
-
-        // solid white background
-        dt.fill(Color::from_rgba8(0xFF, 0xFF, 0xFF, 0xFF));
+        let mut dt = self.new_pixmap();
         
         // display hands for living players (at fixed position)
         for i in 0..hands.len()
         {
             let player_num = p_alive[i];
             let is_active = p_cur == i;
-            self.draw_hand(&mut dt, player_num, &hands[i], is_active);
+            self.draw_hand(&mut dt, player_num, &hands[i], is_active, state.noped[i]);
         }
 
         // display turn summary (in center of screen)
         if state.turn_summary.len() > 0
         {
-            let text_width = 150.0;
+            let text_width = 200.0;
             let text_height = self.font_size;
             let text_x = 0.5*960.0 - 0.5*text_width;
             let mut text_y = 0.5*540.0 - 0.5*(state.turn_summary.len() as f32)*text_height;
@@ -135,6 +157,20 @@ impl Display
             }
         }
 
+        self.save_png(turn_num, dt);
+    }
+
+    fn new_pixmap(&self) -> Pixmap
+    {
+        let mut dt = Pixmap::new(960, 540).unwrap();
+
+        // solid white background
+        dt.fill(Color::from_rgba8(0xFF, 0xFF, 0xFF, 0xFF));
+        return dt;
+    }
+
+    fn save_png(&self, turn_num:usize, dt:Pixmap)
+    {
         let filename = "turn_".to_owned() + &format!("{:0>4}", turn_num.to_string());
         let filepath = "images_gamestate/".to_owned() + &filename + ".png";
         let result = dt.save_png(filepath);
@@ -144,18 +180,21 @@ impl Display
         };
     }
 
-    fn draw_hand(&self, dt:&mut Pixmap, position:usize, hand:&Hand, is_active:bool)
+    fn get_circle_positions() -> Vec<Pos>
     {
-        if hand.len() <= 0 { return; }
-
-        // positioned in a circle around the table
-        let positions:Vec<Pos> = vec![
+        return vec![
             Pos { x: 0.5*960.0, y: 0.15*540.0 },
             Pos { x: 0.85*960.0, y: 0.5*540.0 },
             Pos { x: 0.5*960.0, y: 0.85*540.0 },
             Pos { x: 0.15*960.0, y: 0.5*540.0 }
         ];
+    }
 
+    fn draw_hand(&self, dt:&mut Pixmap, position:usize, hand:&Hand, is_active:bool, noped:bool)
+    {
+        if hand.len() <= 0 { return; }
+
+        let positions = Display::get_circle_positions();
         let mut base_pos = positions[position].clone();
 
         let card_width:f32 = 25.0;
@@ -170,13 +209,20 @@ impl Display
         base_pos.x -= 0.5*num_cols*(card_width+margin);
         base_pos.y -= 0.5*num_rows*(card_height+margin);
 
+        let pos_above = base_pos.y - self.font_size;
+        let pos_below = base_pos.y + num_rows*(card_height+margin) + 0.2*self.font_size;
+        let max_text_width = num_cols.max(3.0) * (card_width+margin);
+
+        // display if it's their turn ABOVE the cards
         if is_active
+        { 
+            self.print_on_canvas(dt,  &"Turn".to_owned(), base_pos.x, pos_above, max_text_width);
+        }
+
+        // display if they NOPED this round BELOW the cards
+        if noped
         {
-            let max_width = num_cols.max(3.0) * (card_width+margin);
-            let x = base_pos.x.clamp(10.0, 950.0);
-            let mut y = base_pos.y + num_rows*(card_height+margin) + self.font_size;
-            if base_pos.y > self.font_size { y = base_pos.y - self.font_size; }
-            self.print_on_canvas(dt,  &"Turn".to_owned(), x, y, max_width);
+            self.print_on_canvas(dt,  &"Nope!".to_owned(), base_pos.x, pos_below, max_text_width);
         }
 
         // for each card, draw a rectangle in the right color (offset to show all cards nicely)

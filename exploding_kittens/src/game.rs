@@ -48,6 +48,7 @@ pub struct GameState {
     pub prev_exploded: bool,
     pub exploded: Vec<bool>,
     pub prev_victim: Vec<usize>,
+    pub noped: Vec<bool>,
 
     pub turn_summary: Vec<String>
 }
@@ -70,7 +71,8 @@ impl GameState
             prev_exploded: false,
             exploded: Vec::new(),
             prev_victim: Vec::new(),
-            turn_summary: Vec::new()
+            turn_summary: Vec::new(),
+            noped: Vec::new()
         }
     }
 
@@ -78,6 +80,7 @@ impl GameState
     {
         self.exploded = vec![false; player_count];
         self.prev_victim = vec![10; player_count];
+        self.noped = vec![false; player_count];
     }
     
     // resets everything that is NOT kept between turns
@@ -94,6 +97,7 @@ impl GameState
         self.wanted_card = Card::Defuse;
         self.will_draw_kitten = false;
         self.cards_played = 0;
+        self.noped = vec![false; self.noped.len()];
     }
 }
 
@@ -146,6 +150,14 @@ impl Game
         display.set_font_size(20.0);
 
         state.turn_summary = vec!["Game start!".to_owned()];
+
+        // ugly fix to show strategies for longer at start of the output video
+        for _i in 0..2
+        {
+            display.put_strategies_to_png(turn_num, &strategies);
+            turn_num += 1;
+        }
+        
         display.save_gamestate_to_png(turn_num, &hands, &players_alive, cur_player, &state);
         
         while !game_is_over
@@ -193,11 +205,12 @@ impl Game
             game_is_over = players_alive.len() <= 1;
 
             // repeat a turn by not changing the player
-            state.prev_exploded = draw_result == DrawResult::Defuse;
+            let prev_defused = draw_result == DrawResult::Defuse;
+            let prev_died = draw_result == DrawResult::Death;
+            state.prev_exploded = prev_defused;
             if game_is_over { state.repeat_turns = 0; }
    
-            state.reset();
-            if state.repeat_turns > 0 {
+            if state.repeat_turns > 0 && !prev_died {
                 Debugger::print("Repeating turn");
                 Debugger::print(state.repeat_turns);
                 state.turn_summary.push("Repeating turn".to_owned());
@@ -205,21 +218,22 @@ impl Game
 
             display.save_gamestate_to_png(turn_num, &hands, &players_alive, cur_player, &state);
             
+            state.reset();
             if state.repeat_turns > 0 
             { 
                 state.repeat_turns -= 1;
                 continue;
             }
 
-            // if we increase player num on death, we actually SKIP a player!
-            if draw_result == DrawResult::Death { continue; } 
+            // if we increase player num on death, we actually SKIP a player! So don't do that
+            if prev_died { continue; } 
 
             cur_player += 1;
         }
 
         let winning_player = players_alive[0];
         let winning_strategy:Strat = strategies[0].clone();
-        let winning_hand:Hand = starting_hands[0].clone();
+        let winning_hand:Hand = starting_hands[winning_player].clone();
         Simulator::save_results(res, winning_player, winning_strategy, winning_hand);
     }
 
@@ -230,6 +244,7 @@ impl Game
         players_alive.remove(num);
         state.exploded.remove(num);
         state.prev_victim.remove(num);
+        state.noped.remove(num);
     }
 
     fn play_cards(num:usize, hands:&mut Vec<Hand>, deck:&mut Vec<Card>, strategies:&Vec<Strat>, state:&mut GameState)
@@ -282,7 +297,7 @@ impl Game
         // This is "leading": if provides a max number of cards to play, regardless of whatever else happens 
         let mut rng = rand::thread_rng();
         let mut keep_playing:bool = false;
-        let mut only_play_as_needed:bool = true;
+        let mut only_play_as_needed:bool = false;
         let play_strat = *strat.get("play").unwrap();
 
         match play_strat
@@ -292,8 +307,8 @@ impl Game
             Strategy::Play(StratPlay::One) => { keep_playing = state.cards_played == 0; }
             Strategy::Play(StratPlay::Two) => { keep_playing = state.cards_played < 2; }
             Strategy::Play(StratPlay::Three) => { keep_playing = state.cards_played < 3; }
-            Strategy::Play(StratPlay::AsNeeded) => { keep_playing = true; }
-            Strategy::Play(StratPlay::All) => { keep_playing = true; only_play_as_needed = false; }
+            Strategy::Play(StratPlay::AsNeeded) => { keep_playing = true; only_play_as_needed = true; }
+            Strategy::Play(StratPlay::All) => { keep_playing = true; }
             Strategy::Play(StratPlay::OnlyAfterKitten) => { 
                 keep_playing = state.prev_exploded && !state.played_anti;
             }
@@ -301,7 +316,7 @@ impl Game
                 keep_playing = !hands[num].contains(&Card::Defuse) && !state.played_anti;
             }
             Strategy::Play(StratPlay::AggroStart) => {
-                let many_players_left = hands.len() <= 2;
+                let many_players_left = hands.len() > 2;
                 let many_cards_left = Helpers::count_total_cards(&hands) >= 10;
                 keep_playing = many_players_left || many_cards_left;
             }
@@ -366,7 +381,7 @@ impl Game
     pub fn pick_card_to_play(num:usize, hands:&Vec<Hand>, strat:&Strat, state:&mut GameState) -> Option<Combo>
     {
         // determine what we want to play
-        let mut playable_hand = Helpers::get_playable_cards(&hands[num]);
+        let mut playable_hand = Helpers::get_playable_cards(&hands[num], state);
         if playable_hand.len() <= 0 { return None; }
 
         let mut rng = rand::thread_rng();
@@ -433,13 +448,14 @@ impl Game
         return Some((playable_hand[rand_idx], 1));
     }
 
-    pub fn was_noped(num:usize, hands:&mut Vec<Hand>, card: Combo, strategies:&Vec<Strat>, victim: Option<usize>) -> bool
+    pub fn was_noped(num:usize, hands:&mut Vec<Hand>, card: Combo, strategies:&Vec<Strat>, victim: Option<usize>, state:&mut GameState) -> bool
     {
         // random order is necessary, because ANYONE can nope, so no preference should be given
         let player_order:Vec<usize> = Helpers::get_random_player_order(hands.len());
         let mut num_nopes:usize = 0;
 
-        let is_combo = card.1 > 1; // TO DO: use this for something?? A strategy that only nopes COMBOS? Favor noping combos?
+        // TO DO: use this for something?? A strategy that only nopes COMBOS? Favor noping combos?
+        //let is_combo = card.1 > 1; 
 
         loop 
         {
@@ -460,6 +476,7 @@ impl Game
                     let nope_card_idx = Helpers::get_index(Card::Nope, &hands[idx]);
                     hands[idx].remove(nope_card_idx);
                     num_nopes += 1;
+                    state.noped[idx] = true;
                     break;
                 }
             }
@@ -483,7 +500,7 @@ impl Game
 
         let mut rng = rand::thread_rng();
 
-        let was_noped = Game::was_noped(num, hands, combo, strategies, None);
+        let was_noped = Game::was_noped(num, hands, combo, strategies, None, state);
         if was_noped { return true; } // nope destroys the original card, even though it was never "played"
 
         let strat = &strategies[num];
@@ -645,7 +662,7 @@ impl Game
         Debugger::print(idx);
 
         // players can nope the steal action
-        let was_noped = Game::was_noped(num, hands, combo, strategies, Some(idx));
+        let was_noped = Game::was_noped(num, hands, combo, strategies, Some(idx), state);
         if was_noped { return; } 
 
         let victim_now_has_no_cards = hands[idx].len() <= 0;

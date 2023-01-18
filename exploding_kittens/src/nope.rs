@@ -1,6 +1,6 @@
 use rand::Rng;
 
-use crate::{strats::{StratNope, Card, Hand, Strat, Strategy, StratNopeCustom}, helpers::Helpers};
+use crate::{strats::{Card, Hand, Strat, Strategy, StratNopeCustom}, helpers::Helpers};
 
 pub struct Nope {}
 
@@ -30,7 +30,9 @@ impl Nope
         return false;
     }
 
-    pub fn opponent_will_nope(num:usize, card:Card, hands:&mut Vec<Hand>, strat:&Strat, direct_attack:bool) -> bool
+    // TO DO: card variable is unused for now; is it useful to make strategies that only nope specific cards?
+    // the "direct_attack" thing already knows this to some extent
+    pub fn opponent_will_nope(num:usize, _card:Card, hands:&mut Vec<Hand>, strat:&Strat, direct_attack:bool) -> bool
     {
         if !hands[num].contains(&Card::Nope) { return false; }
 

@@ -221,6 +221,9 @@ mod tests {
         let num:usize = 0;
         let opponent_num = 1;
         let card = Card::Attack;
+        let mut state = GameState::new();
+        state.init(2);
+
         let mut hands:Vec<Hand> = vec![vec![Card::Attack], vec![Card::Nope]];
         let options = Simulator::setup().options;
         let mut strat = Helpers::generate_random_strategy(&options);
@@ -247,7 +250,7 @@ mod tests {
         hands = vec![vec![Card::Attack], vec![Card::Nope]];
         let mut strats = vec![strat.clone(), strat.clone()];
         let combo:Combo = (Card::Attack, 1);
-        let nope_result:bool = Game::was_noped(num, &mut hands, combo, &strats, None);
+        let nope_result:bool = Game::was_noped(num, &mut hands, combo, &strats, None, &mut state);
         assert_eq!(hands[1].len(), 0);
         assert_eq!(nope_result, true);
 
@@ -255,7 +258,7 @@ mod tests {
         // (both lose that card, but the end result is false = no noping)
         hands = vec![vec![Card::Attack, Card::Nope], vec![Card::Nope]];
         strats[0].insert("nope".to_owned(), Strategy::Nope(StratNope::Always));
-        let nope_result:bool = Game::was_noped(num, &mut hands, combo, &strats, None);
+        let nope_result:bool = Game::was_noped(num, &mut hands, combo, &strats, None, &mut state);
         assert_eq!(nope_result, false);
         assert_eq!(hands[0].len(), 1);
         assert_eq!(hands[1].len(), 0);

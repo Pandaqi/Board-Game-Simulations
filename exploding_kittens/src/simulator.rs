@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use enum_iterator::all;
 
-use crate::{config::{SimConfig, CONFIG}, game::Game, results::SimResults, strats::{StratCombo, StratNope, StratPlay, Strat, StratKitten, StratVictim, StratList, Strategy, StratComboPref, StratComboType, StratAnswer, StratFuture, StratNopeDefend, StratNopeCustom, Hand}, helpers::Helpers};
+use crate::{config::{CONFIG}, game::Game, results::SimResults, strats::{StratCombo, StratNope, StratPlay, Strat, StratKitten, StratVictim, StratList, Strategy, StratComboPref, StratComboType, StratAnswer, StratFuture, StratNopeDefend, StratNopeCustom, Hand}, helpers::Helpers};
 
 pub struct Simulator {}
 

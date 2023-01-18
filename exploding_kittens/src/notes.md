@@ -2,6 +2,7 @@
 * Strategieën
   * Veel meer (gedetailleerde) speelstrategieën
   * Future nog eens bekijken?
+  * Toch inbouwen dat, als je zéker bent dat een speler nog een Defuse hebt, je jouw strategie overschrijdt en die kaart vraagt (als je een combo van 3 hebt)??
 * Kijk nog eens naar hoe Attack is ingebouwd en of dat nou 100% klopt met de spelregels.
 * Misschien nog wat meer getalletjes en grafieken. Ik bedoel, als we de simulatie toch hebben ...
 * Schrijf TESTS voor de COMBO functies en meer specifieke strategieën

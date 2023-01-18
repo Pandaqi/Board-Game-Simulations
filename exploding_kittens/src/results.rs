@@ -1,4 +1,4 @@
-use crate::{helpers::{Helpers}, config::{SimConfig, CONFIG}, strats::{StratList, Card}};
+use crate::{helpers::{Helpers}, config::{CONFIG}, strats::{StratList, Card}};
 
 use plotters::{prelude::*};
 use std::{ops::Range};

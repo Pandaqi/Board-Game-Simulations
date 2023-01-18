@@ -1,6 +1,6 @@
 use rand::Rng;
 
-use crate::{strats::{Combo, StratCombo, Hand, Strat, Card, Strategy}, helpers::{CARD_DATA, Helpers}};
+use crate::{strats::{Combo, Hand, Strat, Card, Strategy}, helpers::{CARD_DATA, Helpers}};
 
 pub struct Combos {}
 

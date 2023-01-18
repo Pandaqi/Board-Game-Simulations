@@ -1,5 +1,4 @@
 mod simulator;
-use config::SimConfig;
 
 use crate::simulator::Simulator;
 

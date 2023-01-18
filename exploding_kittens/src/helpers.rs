@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use rand::{Rng, seq::{SliceRandom, IteratorRandom}};
 
-use crate::{strats::{CardData, Card, Hand, Strat, StratList, Strategy, StratAnswer, StratFuture}, combos::Combos};
+use crate::{strats::{CardData, Card, Hand, Strat, StratList, Strategy, StratAnswer, StratFuture}, combos::Combos, game::GameState};
 
 lazy_static! {
     pub static ref CARD_DATA:HashMap<Card, CardData> = HashMap::from([
@@ -277,12 +277,13 @@ impl Helpers
         return sum;
     }
 
-    pub fn get_playable_cards(cards:&Hand) -> Vec<Card>
+    pub fn get_playable_cards(cards:&Hand, state:&mut GameState) -> Vec<Card>
     {
         let mut arr:Vec<Card> = Vec::new();
         for v in cards.iter()
         {
             if !CARD_DATA[v].play { continue; }
+            if *v == Card::Future && state.saw_future { continue; }
             arr.push(*v);
         }
         return arr;
@@ -304,15 +305,20 @@ impl Helpers
         return arr;
     }
 
+    pub fn extract_inside_parentheses_single(txt:&String) -> String
+    {
+        let start_bytes = txt.find("(").unwrap_or(0)+1;
+        let end_bytes = txt.find(")").unwrap_or(txt.len());
+        let result = &txt[start_bytes..end_bytes];
+        return result.to_owned();
+    }
+
     pub fn extract_inside_parentheses(list:Vec<String>) -> Vec<String>
     {
         let mut arr:Vec<String> = Vec::new();
         for v in list.iter()
         {
-            let start_bytes = v.find("(").unwrap_or(0)+1;
-            let end_bytes = v.find(")").unwrap_or(v.len());
-            let result = &v[start_bytes..end_bytes];
-            arr.push(result.to_owned());
+            arr.push(Helpers::extract_inside_parentheses_single(v));
         }
         return arr;
     }
