@@ -20,7 +20,7 @@ lazy_static! {
     pub static ref CONFIG:SimConfig = SimConfig 
     {
         file_prefix: "frequency_for_winner".to_string(),
-        num_iterations: 150000,
+        num_iterations: 200000,
         print_interval: 10000,
         player_count: 4,
         randomize_player_count: true,
