@@ -4,7 +4,7 @@ use std::{ops::Range};
 use crate::{game::Deck, strats::IdeaList, config::SimConfig, helpers::Helpers};
 
 pub struct SimResults {
-    pub wins_per_player: Vec<usize>,
+    pub wins_per_player: Vec<i32>,
     pub options: IdeaList,
     pub strats: IdeaList,
 }
@@ -18,8 +18,8 @@ impl Results
         let cfg = SimConfig::new();
         if cfg.track_per_player 
         {
-            let player_wins = Helpers::to_string_list(&res.wins_per_player);
-            let player_options = Helpers::to_string_list(&(0..cfg.player_count).collect());
+            let player_wins = res.wins_per_player.clone();
+            let player_options = (0..(cfg.player_count as i32)).collect();
             Results::to_histogram(&cfg, "per_player_check", player_wins, player_options);
         }
 
@@ -27,14 +27,14 @@ impl Results
         {
             for(k,v) in res.options.iter()
             {
-                let strats = Helpers::extract_inside_parentheses(Helpers::to_string_list(res.strats.get(k).unwrap()));
-                let options = Helpers::extract_inside_parentheses(Helpers::to_string_list(v));
+                let strats = res.strats.get(k).unwrap().clone();
+                let options = v.clone();
                 Results::to_histogram(&cfg, &k, strats, options);
             }
         }
     }
       
-    fn to_histogram(cfg:&SimConfig, file_key:&str, data:Vec<String>, x_values:Vec<String>)
+    fn to_histogram(cfg:&SimConfig, file_key:&str, data:Vec<i32>, x_values:Vec<i32>)
     {
         let zoom_out = 2.0; // often seems best, 3.0 or 4.0 too far away
         let upper_bound = (zoom_out * (data.len() as f64) / (x_values.len() as f64)) as i32;
@@ -63,6 +63,7 @@ impl Results
         ctx.draw_series(
             Histogram::vertical(&ctx)
             .margin(5)
+            .style(BLUE.mix(0.85).filled())
             .data(data.iter().map(|x| (x, 1)))
         ).unwrap();
     }

@@ -1,6 +1,6 @@
 use enum_iterator::all;
 
-use crate::{strats::Idea, game::{Card, Hand}};
+use crate::{strats::Idea, game::{Card, Hand, State}};
 
 pub struct Helpers {}
 
@@ -20,6 +20,86 @@ impl Helpers
     pub fn hand_matches_card_back(card:&Card, hand:&Hand) -> bool
     {
         return hand.contains_key(&card.color) || hand.contains_key(&card.back1) || hand.contains_key(&card.back2);
+    }
+
+    pub fn color_matches_card_back(card:&Card, color:u8) -> bool
+    {
+        return card.color == color || card.back1 == color || card.back2 == color;
+    }
+
+    pub fn get_player_with_highest_score(state:&State) -> usize
+    {
+        let mut highest_score = 0;
+        let mut player = 0;
+        for (k,v) in state.score.iter().enumerate()
+        {
+            if *v <= highest_score { continue; }
+            highest_score = *v;
+            player = k;
+        }
+        return player;
+    }
+
+    pub fn get_player_with_lowest_score(state:&State) -> usize
+    {
+        let mut lowest_score = 0;
+        let mut player = 0;
+        for (k,v) in state.score.iter().enumerate()
+        {
+            if *v >= lowest_score { continue; }
+            lowest_score = *v;
+            player = k;
+        }
+        return player;
+    }
+
+    pub fn is_guaranteed_steal(card:&Card, hand:&Hand) -> bool
+    {
+        return Helpers::count_matching_colors(card, hand) >= 3;
+    }
+
+    pub fn count_stacks_bigger_than(threshold:usize, hand:&Hand) -> i32
+    {
+        let mut sum:i32 = 0;
+        for (_k,v) in hand.iter()
+        {
+            if *v < threshold { continue; }
+            sum += 1;
+        }
+        return sum;
+    }
+
+    pub fn count_stacks_smaller_than(threshold:usize, hand:&Hand) -> i32
+    {
+        let mut sum:i32 = 0;
+        for (_k,v) in hand.iter()
+        {
+            if *v > threshold { continue; }
+            sum += 1;
+        }
+        return sum;
+    }
+
+    pub fn count_matching_cards(card:&Card, hand:&Hand) -> i32
+    {
+        let mut sum:i32 = 0;
+        for (color, amount) in hand.iter()
+        {
+            if !Helpers::color_matches_card_back(card, *color) { continue; }
+            sum += *amount as i32;
+        }
+        return sum;
+    }
+
+    pub fn count_matching_colors(card:&Card, hand:&Hand) -> i32
+    {
+        let mut sum:i32 = 0;
+        for (color, amount) in hand.iter()
+        {
+            if !Helpers::color_matches_card_back(card, *color) { continue; }
+            sum += 1;
+        }
+        return sum;
     }
 
     pub fn get_all_possible_cards() -> Vec<Card>

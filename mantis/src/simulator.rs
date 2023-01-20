@@ -44,7 +44,7 @@ impl Simulator
     pub fn save_results(res:&mut SimResults, state:State)
     {
         let winning_player = state.winner;
-        res.wins_per_player.push(winning_player);
+        res.wins_per_player.push(winning_player as i32);
 
         let winning_strategy = state.strategies[winning_player].clone();
         for (k,v) in winning_strategy.iter()

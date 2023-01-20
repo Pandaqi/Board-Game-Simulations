@@ -10,6 +10,18 @@ Marrakech
 Kwakzalvers van Kakelenburg
 Ticket to Ride
 
+
+== Implementatie ==
+Ik denk toch dat numerieke strategieën veruit het beste zijn. 
+Dus alle opties krijgen een _score_, en je pakt simpelweg degene met de hoogste score.
+(Eventueel converteren we dus de nummers terug naar een Enum waar dat handig is)
+
+Bijvoorbeeld: Kingdomino.
+
+* Voor elke optie die er ligt (die nog over is; die je kan kiezen)
+* Ga alle plekken aan ons koninkrijk af en geef scores => onthoud de beste plek
+* Deze beste plek is hoe "goed" deze optie is => pak de optie met hoogste score
+
 == Vervolgen ==
 
 Exploding Kittens: Expansions

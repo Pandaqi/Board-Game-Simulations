@@ -16,8 +16,8 @@ impl fmt::Display for Idea {
     }
 }
 
-pub type Ideas = HashMap<String, Idea>;
-pub type IdeaList = HashMap<String, Vec<Idea>>;
+pub type Ideas = HashMap<String, i32>;
+pub type IdeaList = HashMap<String, Vec<i32>>;
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Sequence)]
 pub enum IdeaAction {

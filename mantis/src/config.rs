@@ -7,9 +7,10 @@ impl SimConfig
     pub fn new() -> Self
     {
         Self {
-            file_prefix: "lala".to_string(),
+            file_prefix: "second_test".to_string(),
             num_iterations: 100000,
             print_interval: 1000,
+            double_strategy: false,
             player_count: 4,
             score_threshold_base: 10,
             score_threshold: 10,
@@ -23,13 +24,44 @@ impl SimConfig
             cards: Vec::new(),
             options: HashMap::new(),
             options_dict: HashMap::from([
-                ("action".to_owned(), Idea::Action(IdeaAction::Pass)),
-                ("action_rating".to_owned(), Idea::ActionRating(IdeaActionRating::Pass)),
-                ("win_cond".to_owned(), Idea::Win(IdeaWin::Pass)),
-                ("rate_tank_self".to_owned(), Idea::RateTank(IdeaRateTank::Pass)),
-                ("rate_card_self".to_owned(), Idea::RateCard(IdeaRateCard::Pass)),
-                ("rate_tank_other".to_owned(), Idea::RateTank(IdeaRateTank::Pass)),
-                ("rate_card_other".to_owned(), Idea::RateCard(IdeaRateCard::Pass)),
+
+                // points per color that matches (the back of the top card)
+                ("other_color_match".to_owned(), (-1..=1).collect()),
+
+                // points per card that matches (the back of the top card),
+                ("other_card_match".to_owned(), (-1..=1).collect()), 
+
+                // points per card you possess
+                ("other_card".to_owned(), (-1..=1).collect()),
+
+                // points per (unique) color you possess
+                ("other_color".to_owned(), (-1..=1).collect()),
+
+                // points if this player is winning ( = first place)
+                // or losing ( = last place)
+                ("other_winner".to_owned(), (-1..=1).collect()),
+                ("other_loser".to_owned(), (-1..=1).collect()),
+
+                // points if this player is ABOUT to win ( = score within a few of the threshold)
+                ("other_near_win".to_owned(), (-1..=1).collect()),
+
+                // points for how many small/big stacks you have (<=1, >=3)
+                ("other_small_stack".to_owned(), (-1..=1).collect()),
+                ("other_big_stack".to_owned(), (-1..=1).collect()),
+
+                // a fixed numerical offset from all your own scores (higher value = more likely to score)
+                ("offset".to_owned(), (-1..=1).collect()),
+
+                // how to value a guaranteed steal (three matching colors)
+                ("guaranteed_steal".to_owned(), (-1..=1).collect()),
+
+                // points for a player who is close to you in score
+                ("close_score".to_owned(), (-1..=1).collect()),
+
+                // points for a player who is better than you in score
+                ("better_score".to_owned(), (-1..=1).collect()),
+
+                
             ])
         }
     }
@@ -47,8 +79,24 @@ impl SimConfig
 
     pub fn generate_all_strats(cfg:&SimConfig) -> IdeaList
     {
-        // this lists ALL strategies across all categories
-        // then we grab slices to save them per category
+        let mut arr:IdeaList = HashMap::new();
+        for (k,v) in cfg.options_dict.iter()
+        {
+            arr.insert(k.clone(), v.clone());
+
+            if cfg.double_strategy && &k[..5] == "other"
+            {
+                arr.insert(k.clone().replace("other", "self"), v.clone());
+            }
+        }
+        return arr;
+    }
+
+    /*
+    pub fn generate_all_strats(cfg:&SimConfig) -> IdeaList
+    {
+        // in this case, `options_dict` is a HashMap with <String, OneEnumValueOfCategory>
+        // list ALL strategies across all categories; then grab slices to save them per category
         let fields_auto = all::<Idea>().collect::<Vec<_>>();
         let mut options:IdeaList = HashMap::new();
         for (k,v) in cfg.options_dict.iter()
@@ -57,6 +105,7 @@ impl SimConfig
         }
         return options;
     }
+     */
 
     pub fn generate_all_cards() -> Vec<Card>
     {
@@ -87,6 +136,13 @@ impl SimConfig
         }
         return arr;
     }
+
+    pub fn test_setup(&mut self, player_count:usize)
+    {
+        self.player_count = player_count;
+        self.cards = SimConfig::generate_all_cards();
+        self.options = SimConfig::generate_all_strats(&self);
+    }
 }
 
 pub struct SimConfig {
@@ -105,5 +161,6 @@ pub struct SimConfig {
     pub score_threshold_base: usize,
     pub score_threshold: usize,
     pub options: IdeaList,
-    pub options_dict: HashMap<String, Idea>
+    pub options_dict: HashMap<String, Vec<i32>>,
+    pub double_strategy: bool,
 }
