@@ -1,6 +1,9 @@
 use std::collections::HashMap;
-use enum_iterator::all;
 use crate::{game::{Deck, Card, Color, Game}, strats::{Ideas, IdeaList, Idea, IdeaAction, IdeaWin, IdeaActionRating, IdeaRateCard, IdeaRateTank}, helpers::Helpers};
+
+// Use this FFMPEG command to turn your sequence of images (from "create_gamestate_video") into a video (-r = framerate)
+// ffmpeg -r 1/3 -f image2 -s 960x540 -i turn_%04d.png -vcodec libx264 -crf 25 -pix_fmt yuv420p test.mp4
+
 
 impl SimConfig
 {
@@ -8,16 +11,16 @@ impl SimConfig
     {
         Self {
             file_prefix: "second_test".to_string(),
-            num_iterations: 100000,
+            num_iterations: 1,
             print_interval: 1000,
             double_strategy: false,
             player_count: 4,
             score_threshold_base: 10,
             score_threshold: 10,
-            randomize_player_count: true,
-            create_gamestate_video: false,
+            randomize_player_count: false,
+            create_gamestate_video: true,
             print_gameplay: false,
-            track_wins: true,
+            track_wins: false,
             track_per_player: false,
             track_start_cards: false,
             fixed: HashMap::new(),
@@ -49,6 +52,12 @@ impl SimConfig
                 ("other_small_stack".to_owned(), (-1..=1).collect()),
                 ("other_big_stack".to_owned(), (-1..=1).collect()),
 
+                // points for the biggest matching stack 
+                ("other_biggest_stack".to_owned(), (-1..=1).collect()),
+
+                // points for matching two colours
+                ("other_match_two".to_owned(), (-1..=1).collect()),
+
                 // a fixed numerical offset from all your own scores (higher value = more likely to score)
                 ("offset".to_owned(), (-1..=1).collect()),
 
@@ -61,6 +70,12 @@ impl SimConfig
                 // points for a player who is better than you in score
                 ("better_score".to_owned(), (-1..=1).collect()),
 
+                // points for a player who has a significant lead
+                ("lead_score".to_owned(), (-1..=1).collect()),
+
+                // points for override strategy (-4 = always score, 4 = random, rest is pass)
+                // "always steal" is impossible, as you need to score to win
+                ("override".to_owned(), (-4..=4).collect()),
                 
             ])
         }

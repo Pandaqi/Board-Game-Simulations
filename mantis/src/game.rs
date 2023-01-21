@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use enum_iterator::Sequence;
 use rand::{Rng, seq::SliceRandom};
 
-use crate::{config::SimConfig, results::SimResults, simulator::Simulator, strats::{Ideas, IdeaAction, Idea}, helpers::Helpers};
+use crate::{config::SimConfig, results::SimResults, simulator::Simulator, strats::{Ideas, IdeaAction, Idea}, helpers::Helpers, display::Display};
 
 pub type Hand = HashMap<Color, usize>;
 pub type Deck = Vec<Card>;
@@ -31,6 +31,8 @@ impl Card
 pub struct State {
     pub print_gameplay: bool,
 
+    pub turn_num: usize,
+    pub screenshot_num: usize,
     pub winner: usize,
     pub player_count: usize,
     pub cur_player: usize,
@@ -40,8 +42,11 @@ pub struct State {
     pub score: Vec<usize>,
     pub strategies: Vec<Ideas>,
 
+    pub action_taken: Action,
     pub steal_success: bool,
     pub score_success: bool,
+    pub last_player_ratings: Vec<i32>,
+    pub last_victim: usize,
 }
 
 impl State 
@@ -56,6 +61,8 @@ impl State
         Self {
             print_gameplay: cfg.print_gameplay,
             winner: 0,
+            turn_num: 0,
+            screenshot_num: 0,
             player_count,
             cur_player,
             score_threshold: cfg.score_threshold,
@@ -64,7 +71,10 @@ impl State
             score: vec![0; cfg.player_count],
             strategies,
             steal_success: false,
-            score_success: false
+            score_success: false,
+            last_player_ratings: vec![-100; cfg.player_count],
+            action_taken: Action::Score,
+            last_victim: 0,
         }
     }
 
@@ -94,9 +104,19 @@ impl State
         if !self.print_gameplay { return; }
         println!("");
     }
+
+    pub fn save_last_player_ratings(&mut self, list: &Vec<(usize, i32)>)
+    {
+        let mut vec:Vec<i32> = vec![-100; self.player_count];
+        for (_k,v) in list.iter().enumerate()
+        {
+            vec[v.0] = v.1;
+        }
+        self.last_player_ratings = vec;
+    }
 }
 
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Eq, PartialEq, Debug, Clone, Copy)]
 pub enum Action
 {
     Score,
@@ -107,14 +127,17 @@ pub struct Game {}
 
 impl Game
 {
-    pub fn play(cfg:&mut SimConfig, res:&mut SimResults)
+    pub fn play(cfg:&mut SimConfig, res:&mut SimResults, display: &mut Display)
     {
         SimConfig::randomize_player_count(cfg);
 
         let mut state = State::new(cfg);
+        display.save_strategies_to_png(&mut state);
+        display.save_strategies_to_png(&mut state);
+
         loop
         {
-            Game::take_turn(&mut state);
+            Game::take_turn(&mut state, display);
             if Game::is_over(&mut state) { break; }
             Game::advance_player(&mut state);
         }
@@ -138,11 +161,13 @@ impl Game
         state.print("Do we have it?");
         state.print(we_have_this_color);
 
+        state.last_victim = state.cur_player;
         if we_have_this_color 
         {
             let how_many = *state.hands[state.cur_player].get(&card.color).unwrap() + 1;
             state.score[state.cur_player] += how_many;
             state.hands[state.cur_player].remove(&card.color);
+            state.score_success = true;
             return;
         }
 
@@ -163,6 +188,7 @@ impl Game
         state.print("Do they have it?");
         state.print(they_have_this_color);
 
+        state.last_victim = victim;
         if they_have_this_color 
         {
             let how_many = *state.hands[victim].get(&card.color).unwrap() + 1;
@@ -182,6 +208,8 @@ impl Game
     {        
         // get scores, pick the highest one by default
         let player_scores = Game::score_players(state);
+        state.save_last_player_ratings(&player_scores);
+
         let mut victim:usize = state.cur_player;
         let valid_victim_exists = player_scores.len() > 0;
         if valid_victim_exists { victim = player_scores.first().unwrap().0; }
@@ -190,16 +218,14 @@ impl Game
         let victim_is_us = victim == state.cur_player;
         let mut action:Action = if victim_is_us { Action::Score } else { Action::Steal };
 
-        // allow some strategies to override this
-        let mut prob_score:f64 = 0.5;
-        let mut must_score:bool = false;
-        let mut must_steal:bool = false;
-
-        // TO DO: look at the custom strategies
-
-        // @EXCEPTION: if both overrides activated, ignore both
-        if must_score && !must_steal { action = Action::Score; }
-        if must_steal && !must_score { action = Action::Steal; }
+        // check the single override strategy
+        let mut rng = rand::thread_rng();
+        let override_strat = *state.strategies[state.cur_player].get("override").unwrap();
+        if override_strat == -4 { action = Action::Score; }
+        if override_strat == 4 { action = if rng.gen::<f64>() <= 0.5 { Action::Score } else { Action::Steal } }
+        
+        // @EXCEPTION: check the guaranteed win!
+        if Helpers::score_is_guaranteed_win(state) { action = Action::Score; }
 
         return (action, victim);
     }
@@ -217,6 +243,12 @@ impl Game
             points += Game::get_single_strat_points("guaranteed_steal", player_num, state);
         }
 
+        let two_color_match = Helpers::count_matching_colors(top_card, &state.hands[player_num]) == 2;
+        if two_color_match
+        {
+            points += Game::get_strat_points("match_two", player_num, state);
+        }
+
         points += Game::get_strat_points("card_match", player_num, state)
                 * Helpers::count_matching_cards(top_card, &state.hands[player_num]);
 
@@ -229,12 +261,22 @@ impl Game
         points += Game::get_strat_points("color", player_num, state) 
                 * (state.hands[player_num].keys().len() as i32);
         
+        points += Game::get_strat_points("biggest_stack", player_num, state)
+                * Helpers::get_biggest_stack(&state.hands[player_num]);
+        
         if Helpers::get_player_with_highest_score(state) == player_num
         {
             points += Game::get_strat_points("winner", player_num, state);
+
+            let big_lead = Helpers::get_lead(state.score[player_num], state) >= 5;
+            if big_lead
+            {
+                points += Game::get_single_strat_points("lead_score", player_num, state);
+            }
         }
 
-        if state.score[player_num] >= (state.score_threshold - 3)
+        let close_to_winning = state.score[player_num] >= (state.score_threshold - 3);
+        if close_to_winning
         {
             points += Game::get_strat_points("near_win", player_num, state);
         }
@@ -332,7 +374,7 @@ impl Game
         state.winner = winner;
     }
 
-    pub fn take_turn(state:&mut State)
+    pub fn take_turn(state:&mut State, display:&mut Display)
     {
         state.println();
         state.print("== NEW TURN ==");
@@ -340,8 +382,11 @@ impl Game
         state.print(state.cur_player);
 
         let (action, victim) = Game::determine_action(state);
-        if action == Action::Score { Game::score(state); return; }
-        Game::steal(state, victim);
+        state.action_taken = action.clone();
+        display.save_gamestate_to_png(state, false);
+        
+        if action == Action::Score { Game::score(state); } else { Game::steal(state, victim); }
+        display.save_gamestate_to_png(state, true);
     }
 
     pub fn advance_player(state:&mut State)
@@ -358,6 +403,7 @@ impl Game
             state.cur_player = (state.cur_player + 1) % state.player_count;
         }
 
+        state.turn_num += 1;
         state.steal_success = false;
         state.score_success = false;
     }
@@ -395,10 +441,24 @@ impl Game
     {
         let mut rng = rand::thread_rng();
         let mut strat:Ideas = HashMap::new();
+
         for (k,v) in cfg.options.iter()
         {
             strat.insert(k.clone(), *v.choose(&mut rng).unwrap());
         }
+
+        // @EXCEPTION: if override is on, all other strategies don't matter
+        // to prevent messing with the results, set everyhting else to 0 = pass
+        let is_override = strat.get("override").unwrap().abs() == 4;
+        if is_override
+        {
+            for (k,v) in strat.iter_mut()
+            {
+                if k == "override" { continue; }
+                *v = 0;
+            }
+        }
+
         return strat;
     }
 

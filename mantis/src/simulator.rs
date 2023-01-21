@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{results::SimResults, game::{Game, State}, config::SimConfig, strats::IdeaList};
+use crate::{results::SimResults, game::{Game, State}, config::SimConfig, strats::IdeaList, display::Display};
 
 pub struct Simulator {}
 
@@ -29,13 +29,15 @@ impl Simulator
 
         let mut sim_results = Simulator::setup_results(&cfg);
 
+        let mut display = Display::new(&cfg);
+
         let num_sims = cfg.num_iterations;
         let print_interval = cfg.print_interval;
 
         for n in 0..num_sims
         {
             if n % print_interval == 0 { println!("Playing game {}", n); }
-            Game::play(&mut cfg, &mut sim_results);
+            Game::play(&mut cfg, &mut sim_results, &mut display);
         }
 
         return sim_results;

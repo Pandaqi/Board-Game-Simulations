@@ -10,6 +10,7 @@ mod game;
 mod test;
 mod strats;
 mod helpers;
+mod display;
 
 fn main() {
     let sim_results = Simulator::simulate();

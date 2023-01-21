@@ -73,6 +73,9 @@ mod tests {
         let guaranteed_steal = Helpers::is_guaranteed_steal(&top_card, &hand);
         assert_eq!(guaranteed_steal, true);
 
+        assert_eq!(Helpers::get_biggest_stack(&hand), 4);
+        assert_eq!(Helpers::get_lead(10, &state), 4); // highest non-10 number is 6, so difference is 4
+
     }
 
 }

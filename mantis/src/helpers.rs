@@ -27,6 +27,18 @@ impl Helpers
         return card.color == color || card.back1 == color || card.back2 == color;
     }
 
+    pub fn get_lead(score:usize, state:&State) -> i32
+    {
+        let mut lead = 1000;
+        for (_k,v) in state.score.iter().enumerate()
+        {
+            let dist = (*v as i32 - score as i32).abs();
+            if dist == 0 || dist >= lead { continue; }
+            lead = dist;
+        }
+        return lead;
+    }
+
     pub fn get_player_with_highest_score(state:&State) -> usize
     {
         let mut highest_score = 0;
@@ -56,6 +68,47 @@ impl Helpers
     pub fn is_guaranteed_steal(card:&Card, hand:&Hand) -> bool
     {
         return Helpers::count_matching_colors(card, hand) >= 3;
+    }
+
+    pub fn score_is_guaranteed_win(state:&State) -> bool
+    {
+        return Helpers::is_guaranteed_win(state, state.cur_player);
+    }
+    
+    pub fn is_guaranteed_win(state:&State, num:usize) -> bool
+    {
+        let top_card = state.deck.last().unwrap();
+        if !Helpers::is_guaranteed_steal(top_card, &state.hands[num]) { return false; }
+
+        let points_needed = (state.score_threshold - state.score[num]) as i32;
+        let points_available = Helpers::get_smallest_matching_stack(top_card, &state.hands[num]);
+        let not_enough_points = points_available < points_needed;
+        if not_enough_points { return false; }
+        
+        return true;
+    }
+
+    pub fn get_smallest_matching_stack(card:&Card, hand:&Hand) -> i32
+    {
+        let mut smallest = 1000;
+        for (color, amount) in hand.iter()
+        {
+            if !Helpers::color_matches_card_back(card, *color) { continue; }
+            if *amount >= smallest { continue; }
+            smallest = *amount;
+        }
+        return smallest as i32;
+    }
+
+    pub fn get_biggest_stack(hand:&Hand) -> i32
+    {
+        let mut biggest:i32 = 0;
+        for (_k,v) in hand.iter()
+        {
+            if *v as i32 <= biggest { continue; }
+            biggest = *v as i32;
+        }
+        return biggest;
     }
 
     pub fn count_stacks_bigger_than(threshold:usize, hand:&Hand) -> i32
