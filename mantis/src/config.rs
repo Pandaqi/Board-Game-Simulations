@@ -10,10 +10,10 @@ impl SimConfig
     pub fn new() -> Self
     {
         Self {
-            file_prefix: "second_test".to_string(),
+            file_prefix: "video_5".to_string(),
             num_iterations: 1,
             print_interval: 1000,
-            double_strategy: false,
+            double_strategy: true,
             player_count: 4,
             score_threshold_base: 10,
             score_threshold: 10,
@@ -21,12 +21,37 @@ impl SimConfig
             create_gamestate_video: true,
             print_gameplay: false,
             track_wins: false,
-            track_per_player: false,
-            track_start_cards: false,
-            fixed: HashMap::new(),
+            track_per_player: true, // if true, gives 0 player the "fixed" strategy below, and only provides one graph for wins per PLAYER
+            track_start_cards: false, // @TODO: does nothing yet
+            fixed: HashMap::from([
+                ("offset".to_owned(), 5),
+                ("other_color_match".to_owned(), -5),
+                ("other_card_match".to_owned(), -4), 
+                ("other_card".to_owned(), -5),
+                ("other_color".to_owned(), -2),
+                ("other_small_stack".to_owned(), 0),
+                ("other_biggest_stack".to_owned(), -5),
+                ("self_color_match".to_owned(), 5),
+                ("self_card_match".to_owned(), 5), 
+                ("self_card".to_owned(), 5),
+                ("self_color".to_owned(), 5),
+                ("self_small_stack".to_owned(), 5),
+                ("self_biggest_stack".to_owned(), 5),
+            ]),
             cards: Vec::new(),
             options: HashMap::new(),
             options_dict: HashMap::from([
+
+                ("other_color_match".to_owned(), (-5..=5).collect()),
+                ("other_card_match".to_owned(), (-5..=5).collect()), 
+                ("other_card".to_owned(), (-5..=5).collect()),
+                ("other_color".to_owned(), (-5..=5).collect()),
+                ("other_small_stack".to_owned(), (-5..=5).collect()),
+                ("other_biggest_stack".to_owned(), (-5..=5).collect()),
+                ("offset".to_owned(), (-5..=5).collect()),
+            ])
+
+            /*options_dict: HashMap::from([
 
                 // points per color that matches (the back of the top card)
                 ("other_color_match".to_owned(), (-1..=1).collect()),
@@ -75,9 +100,10 @@ impl SimConfig
 
                 // points for override strategy (-4 = always score, 4 = random, rest is pass)
                 // "always steal" is impossible, as you need to score to win
-                ("override".to_owned(), (-4..=4).collect()),
+                // @DEBUGGING/@TODO: this is not set to -4,4 to just completely ignore this one
+                ("override".to_owned(), (-3..=3).collect()),
                 
-            ])
+            ])*/
         }
     }
     

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use enum_iterator::Sequence;
 use rand::{Rng, seq::SliceRandom};
 
-use crate::{config::SimConfig, results::SimResults, simulator::Simulator, strats::{Ideas, IdeaAction, Idea}, helpers::Helpers, display::Display};
+use crate::{config::SimConfig, results::SimResults, simulator::Simulator, strats::{Ideas}, helpers::Helpers, display::Display};
 
 pub type Hand = HashMap<Color, usize>;
 pub type Deck = Vec<Card>;
@@ -220,7 +220,7 @@ impl Game
 
         // check the single override strategy
         let mut rng = rand::thread_rng();
-        let override_strat = *state.strategies[state.cur_player].get("override").unwrap();
+        let override_strat = Game::get_single_strat_points("override", state.cur_player, state);
         if override_strat == -4 { action = Action::Score; }
         if override_strat == 4 { action = if rng.gen::<f64>() <= 0.5 { Action::Score } else { Action::Steal } }
         
@@ -314,7 +314,9 @@ impl Game
 
     pub fn get_single_strat_points(strat:&str, player_num: usize, state:&State) -> i32
     {
-        return *state.strategies[player_num].get(strat).unwrap();
+        let res : Option<&i32> = state.strategies[player_num].get(strat);
+        if res.is_none() { return 0; }
+        return *res.unwrap();
     }
 
     pub fn get_strat_points(strat:&str, player_num:usize, state:&State) -> i32
@@ -325,7 +327,7 @@ impl Game
         {
             name = Game::get_strat(strat, false);
         }
-        return *state.strategies[player_num].get(&name).unwrap();
+        return Game::get_single_strat_points(&name, player_num, state);
     }
 
     pub fn score_players(state:&mut State) -> Vec<(usize, i32)>
@@ -430,15 +432,18 @@ impl Game
     pub fn determine_random_strategies(cfg:&SimConfig) -> Vec<Ideas>
     {
         let mut strats:Vec<Ideas> = Vec::new();
-        for _i in 0..cfg.player_count
+        for i in 0..cfg.player_count
         {
-            strats.push(Game::get_random_strategy(cfg));
+            strats.push(Game::get_random_strategy(i, cfg));
         }
         return strats;
     }
 
-    pub fn get_random_strategy(cfg:&SimConfig) -> Ideas
+    pub fn get_random_strategy(player_num: usize, cfg:&SimConfig) -> Ideas
     {
+        // @EXCEPTION: fixed strategy for player 0
+        if cfg.track_per_player && player_num == 0 { return cfg.fixed.clone(); }
+
         let mut rng = rand::thread_rng();
         let mut strat:Ideas = HashMap::new();
 
@@ -449,13 +454,19 @@ impl Game
 
         // @EXCEPTION: if override is on, all other strategies don't matter
         // to prevent messing with the results, set everyhting else to 0 = pass
-        let is_override = strat.get("override").unwrap().abs() == 4;
-        if is_override
+        // THIS IS NOT TRUE. Setting it to 0 _still_ messes with the results, adding way more entries for 0
+        // This override strategy was a bad idea, just ignore it
+        let override_val = strat.get("override");
+        if override_val.is_some()
         {
-            for (k,v) in strat.iter_mut()
+            let is_override = override_val.unwrap().abs() == 4;
+            if is_override
             {
-                if k == "override" { continue; }
-                *v = 0;
+                for (k,v) in strat.iter_mut()
+                {
+                    if k == "override" { continue; }
+                    *v = 0;
+                }
             }
         }
 

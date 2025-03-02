@@ -1,7 +1,4 @@
 == TO DO ==
-* Visual:
-  *  Highlight active player in thick red border
-  *  Highlight their victim in thin black/grey border => get this from the score list
 * Instead of PRINTING, save the game data into a list on state, then write that to a LOG FILE
 * Card could be a tuple struct => Card(u8, u8, u8) => but I think that's actually bad for performance => could also be an ARRAY, that WOULD be faster 
 * Perhaps it's more useful to go -2,2 and _multiply_ these points by some fixed factor, to exaggerate them
